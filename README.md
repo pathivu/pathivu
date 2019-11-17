@@ -24,8 +24,21 @@ Then run pathivu fluentd plugin to ship logs to pathivu
 ```
 kubectl create -f https://raw.githubusercontent.com/balajijinnah/chola/master/kubernetes/chola.yaml
 ```
+# Use katchi to see logs
+Katchi is cli tool to view logs
+```
+katchi logs --host=http://localhost:5180
+APP: kube-addon-manager-minikube, ts: 2019-11-18 00:06:58 +0530 IST, line: INFO: == Kubernetes addon reconcile completed at 2019-11-17T18:36:58+00:00 ==
+ 
+APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:02 +0530 IST, line: INFO: Leader election disabled.
+ 
+APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: INFO: == Kubernetes addon ensure completed at 2019-11-17T18:37:03+00:00 ==
+ 
+APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: INFO: == Reconciling with deprecated label ==
+ 
+APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: error: no objects passed to apply
 
-Then run pathivu fluentd to ship logs to 
+```
 ## Roadmap
 #
 - Multi node support.
