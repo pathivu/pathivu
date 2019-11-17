@@ -1,0 +1,15 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: chola
+  namespace: kube-logging
+  labels:
+    app: chola
+spec: 
+  selector:
+    app: chola
+  clusterIP: None
+  ports:
+    - port: 5180
+      name: http
+      targetPort: 5180

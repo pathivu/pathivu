@@ -1,0 +1,26 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: chola
+  namespace: kube-logging
+  labels:
+    app: chola
+spec:
+  selector:
+    matchLabels:
+      app: chola
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: chola
+    spec:
+      containers:
+      - name: chola
+        image: schoolboy/chola-nightly  # or just image: redis
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        ports:
+        - containerPort: 5180
