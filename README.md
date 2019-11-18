@@ -4,13 +4,13 @@
   width: 50%;">    
 
 # Pathivu: Logs you can search
-Pathivu is a log aggreation system. It does all the indexing. All you have to shoot the query to find, why account tranfer is failed. It created for cost effective logging at scale.
+Pathivu is a log aggregation system. It does all the indexing. All you have to shoot the query to find, why account transfer failed.
 
-It is primarly aimed for kubernetes but you can run on any deployment.
+Cost-Effective logging at scale.
 
 Not for production use yet. But, you can play around it.
 
-[![asciicast](https://asciinema.org/a/ExDbYIsV2HODC9ORxe1UhVPtS.svg)](https://asciinema.org/a/ExDbYIsV2HODC9ORxe1UhVPtS)
+[![asciicast](https://asciinema.org/a/5rc6hjDyJRn7btF5D3lD4vRnI.svg)](https://asciinema.org/a/5rc6hjDyJRn7btF5D3lD4vRnI)
 ## Usage
 First run pathivu in your cluster.
 
