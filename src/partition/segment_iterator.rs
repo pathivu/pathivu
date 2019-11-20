@@ -56,6 +56,7 @@ impl<S: Store> SegmentIterator<S> {
         partition: String,
         start_ts: u64,
         end_ts: u64,
+        backward: bool,
     ) -> Result<SegmentIterator<S>, failure::Error> {
         // let collect all the posting list for the given indices.
         let mut entry_indices = Vec::new();
@@ -103,6 +104,10 @@ impl<S: Store> SegmentIterator<S> {
         // But the indices in the posting list are in sorted order. Here we can make one
         // more micro optimization if there is only one set no need to sort.
         entry_indices.sort();
+        if backward{
+            // If it is backward reverse indicies so that It'll come in descending order.
+            entry_indices.reverse();
+        }
         // open segment file.
         let mut segment_file = File::open(partition_path.join(format!("{}.segment", id)))?;
         // we'll read all since random access is expensive.

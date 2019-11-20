@@ -39,6 +39,7 @@ pub struct PartitionIterator<S> {
     query: String,
     start_ts: u64,
     end_ts: u64,
+    backward: bool,
 }
 
 impl<S: Store + Clone> PartitionIterator<S> {
@@ -50,6 +51,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         query: String,
         store: S,
         cfg: Config,
+        backward: bool,
     ) -> Result<Option<PartitionIterator<S>>, failure::Error> {
         let buf = store.get(format!("{}_{}", PARTITION_PREFIX, partition).as_bytes())?;
         if buf.is_none() {
@@ -83,6 +85,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 partition.clone(),
                 start_ts,
                 end_ts,
+                backward,
             )?;
             current_iterator = Some(iterator);
         }
@@ -96,6 +99,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             query: query,
             start_ts: start_ts,
             end_ts: end_ts,
+            backward: backward,
         }))
     }
 
@@ -143,6 +147,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             self.partition.clone(),
             self.start_ts,
             self.end_ts,
+            self.backward,
         )?;
         if iterator.entry().is_none() {
             // this iterator doesn't have the query so recursively advance.
