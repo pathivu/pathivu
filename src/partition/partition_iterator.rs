@@ -213,7 +213,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg)
+            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, false)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);

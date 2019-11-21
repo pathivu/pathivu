@@ -24,16 +24,19 @@ pub struct MergeIteartor<S> {
     partition_iterators: Vec<Rc<RefCell<PartitionIterator<S>>>>,
     current_entry: Option<Rc<Entry>>,
     current_parition: String,
+    backward: bool,
 }
 
 impl<S: Store + Clone> MergeIteartor<S> {
     pub fn new(
         itrs: Vec<Rc<RefCell<PartitionIterator<S>>>>,
+        backward: bool,
     ) -> Result<MergeIteartor<S>, failure::Error> {
         let mut itr = MergeIteartor {
             partition_iterators: itrs,
             current_entry: None,
             current_parition: String::from(""),
+            backward: backward,
         };
         itr.next().unwrap();
         return Ok(itr);
@@ -49,6 +52,9 @@ impl<S: Store + Clone> MergeIteartor<S> {
     pub fn next(&mut self) -> Result<Option<()>, failure::Error> {
         // finc the least time stamp.
         let mut prev_ts = std::u64::MAX;
+        if self.backward {
+            prev_ts = std::u64::MIN;
+        }
         let mut inner_entry = None;
         let mut inner_iterator = None;
         // TODO: use heap instead of loop.
@@ -56,6 +62,17 @@ impl<S: Store + Clone> MergeIteartor<S> {
             let entry = iterator.borrow().entry();
             if entry.is_some() {
                 let entry = entry.unwrap();
+                if self.backward {
+                    // TODO: do it with your custom ordering
+                    // Otherwise, It may be the time to do the
+                    // heap thingy.
+                    if entry.ts > prev_ts {
+                        prev_ts = entry.ts;
+                        inner_entry = Some(entry);
+                        inner_iterator = Some(iterator.clone());
+                    }
+                    continue;
+                }
                 if entry.ts < prev_ts {
                     prev_ts = entry.ts;
                     inner_entry = Some(entry);
@@ -106,6 +123,7 @@ mod tests {
             String::from(""),
             store.clone(),
             cfg.clone(),
+            false,
         )
         .unwrap()
         .unwrap();
@@ -114,11 +132,11 @@ mod tests {
         create_segment(1, partition_name.clone(), cfg.clone(), 10, store.clone());
         create_segment(2, partition_name.clone(), cfg.clone(), 14, store.clone());
         let partition_iterator =
-            PartitionIterator::new(partition_name, 10, 19, String::from(""), store, cfg)
+            PartitionIterator::new(partition_name, 10, 19, String::from(""), store, cfg, false)
                 .unwrap()
                 .unwrap();
         itrs.push(Rc::new(RefCell::new(partition_iterator)));
-        let mut merge_itr = MergeIteartor::new(itrs).unwrap();
+        let mut merge_itr = MergeIteartor::new(itrs, false).unwrap();
         let mut count = 0;
         loop {
             let ent = merge_itr.entry();
@@ -149,6 +167,7 @@ mod tests {
             String::from(""),
             store.clone(),
             cfg.clone(),
+            false,
         )
         .unwrap()
         .unwrap();
@@ -157,11 +176,11 @@ mod tests {
         create_segment(1, partition_name.clone(), cfg.clone(), 2, store.clone());
         create_segment(2, partition_name.clone(), cfg.clone(), 6, store.clone());
         let partition_iterator =
-            PartitionIterator::new(partition_name, 1, 10, String::from(""), store, cfg)
+            PartitionIterator::new(partition_name, 1, 10, String::from(""), store, cfg, false)
                 .unwrap()
                 .unwrap();
         itrs.push(Rc::new(RefCell::new(partition_iterator)));
-        let mut merge_itr = MergeIteartor::new(itrs).unwrap();
+        let mut merge_itr = MergeIteartor::new(itrs, false).unwrap();
         let mut num = 1;
         loop {
             let ent = merge_itr.entry().unwrap();
