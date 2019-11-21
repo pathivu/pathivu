@@ -47,6 +47,7 @@ type QueryReq struct {
 	Count      int      `json:"count"`
 	Offset     int      `json:"offset"`
 	Partitions []string `json:"partitions"`
+	Forward    bool     `json:"forward"`
 }
 
 // Line is log line
@@ -153,6 +154,7 @@ func main() {
 				req.StartTs = time.Now().Add(-since).Unix()
 				req.EndTs = time.Now().Unix()
 			}
+			req.Forward = false
 			res := c.query(req)
 			for _, line := range res.Lines {
 				fmt.Printf("APP: %s, ts: %s, line: %s \n", line.App, time.Unix(line.Ts, 0).String(), line.Line)
