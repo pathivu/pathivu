@@ -34,6 +34,7 @@ pub struct QueryRequest {
     pub count: u64,
     pub offset: u64,
     pub partitions: Vec<String>,
+    pub forward: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

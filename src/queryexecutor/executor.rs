@@ -92,7 +92,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
                 req.query.clone(),
                 self.store.clone(),
                 self.cfg.clone(),
-                false,
+                !req.forward,
             );
             // some error happened.
             if let Err(e) = itr {
@@ -105,7 +105,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
             }
             itrs.push(Rc::new(RefCell::new(itr.unwrap())));
         }
-        let itr = MergeIteartor::new(itrs, false);
+        let itr = MergeIteartor::new(itrs, !req.forward);
         if let Err(e) = itr {
             return Err(format!("{}", e));
         }

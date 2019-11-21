@@ -66,6 +66,7 @@ impl<S: Store + Clone> MergeIteartor<S> {
                     // TODO: do it with your custom ordering
                     // Otherwise, It may be the time to do the
                     // heap thingy.
+                   
                     if entry.ts > prev_ts {
                         prev_ts = entry.ts;
                         inner_entry = Some(entry);
@@ -188,6 +189,46 @@ mod tests {
             merge_itr.next().unwrap();
             num = num + 1;
             if num == 8 {
+                break;
+            }
+        }
+    }
+    #[test]
+      fn test_iterator_intersection_backward() {
+        let cfg = get_test_cfg();
+        let store = get_test_store(cfg.clone()).clone();
+        let mut itrs = Vec::new();
+        let partition_name = String::from("temppartition");
+        create_segment(1, partition_name.clone(), cfg.clone(), 1, store.clone());
+        create_segment(2, partition_name.clone(), cfg.clone(), 5, store.clone());
+        let partition_iterator = PartitionIterator::new(
+            partition_name,
+            1,
+            9,
+            String::from(""),
+            store.clone(),
+            cfg.clone(),
+            true,
+        )
+        .unwrap()
+        .unwrap();
+        itrs.push(Rc::new(RefCell::new(partition_iterator)));
+        let partition_name = String::from("temppartition1");
+        create_segment(1, partition_name.clone(), cfg.clone(), 2, store.clone());
+        create_segment(2, partition_name.clone(), cfg.clone(), 6, store.clone());
+        let partition_iterator =
+            PartitionIterator::new(partition_name, 1, 10, String::from(""), store, cfg, true)
+                .unwrap()
+                .unwrap();
+        itrs.push(Rc::new(RefCell::new(partition_iterator)));
+        let mut merge_itr = MergeIteartor::new(itrs, true).unwrap();
+        let mut num = 8;
+        loop {
+            let ent = merge_itr.entry().unwrap();   
+            assert_eq!(ent.ts, num);
+            merge_itr.next().unwrap();
+            num = num - 1;
+            if num == 0 {
                 break;
             }
         }
