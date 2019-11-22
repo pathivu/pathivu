@@ -56,6 +56,7 @@ impl<S: Store> SegmentIterator<S> {
         partition: String,
         start_ts: u64,
         end_ts: u64,
+        backward: bool,
     ) -> Result<SegmentIterator<S>, failure::Error> {
         // let collect all the posting list for the given indices.
         let mut entry_indices = Vec::new();
@@ -133,6 +134,10 @@ impl<S: Store> SegmentIterator<S> {
                 }
             }
             seen_set.insert(read_offset);
+        }
+        if backward {
+            // If it is backward reverse indicies so that It'll come in descending order.
+            entries.reverse();
         }
         Ok(SegmentIterator {
             store: store,

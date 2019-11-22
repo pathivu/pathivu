@@ -359,6 +359,7 @@ pub mod tests {
             String::from("tmppartition"),
             1,
             5,
+            false,
         )
         .unwrap();
         assert_eq!(iterator.entries.len(), 2);
@@ -379,6 +380,7 @@ pub mod tests {
             String::from("tmppartition"),
             1,
             5,
+            false,
         )
         .unwrap();
         assert_eq!(iterator.entries.len(), 1);

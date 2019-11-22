@@ -39,6 +39,7 @@ pub struct PartitionIterator<S> {
     query: String,
     start_ts: u64,
     end_ts: u64,
+    backward: bool,
 }
 
 impl<S: Store + Clone> PartitionIterator<S> {
@@ -50,6 +51,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         query: String,
         store: S,
         cfg: Config,
+        backward: bool,
     ) -> Result<Option<PartitionIterator<S>>, failure::Error> {
         let buf = store.get(format!("{}_{}", PARTITION_PREFIX, partition).as_bytes())?;
         if buf.is_none() {
@@ -70,7 +72,12 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 filtered_segments.push(segment_file.clone());
             }
         }
-        filtered_segments.sort();
+        if backward {
+            filtered_segments.reverse();
+        } else {
+            filtered_segments.sort();
+        }
+
         let mut current_iterator = None;
         if filtered_segments.len() > 0 {
             let segment_file = filtered_segments.get(0).unwrap();
@@ -83,6 +90,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 partition.clone(),
                 start_ts,
                 end_ts,
+                backward,
             )?;
             current_iterator = Some(iterator);
         }
@@ -96,6 +104,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             query: query,
             start_ts: start_ts,
             end_ts: end_ts,
+            backward: backward,
         }))
     }
 
@@ -143,6 +152,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             self.partition.clone(),
             self.start_ts,
             self.end_ts,
+            self.backward,
         )?;
         if iterator.entry().is_none() {
             // this iterator doesn't have the query so recursively advance.
@@ -208,7 +218,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg)
+            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, false)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);
@@ -221,6 +231,34 @@ pub mod tests {
         assert_eq!(partition_iterator.entry().unwrap().ts, 7);
         partition_iterator.next();
         assert_eq!(partition_iterator.entry().unwrap().ts, 9);
+        let valid = partition_iterator.next().unwrap();
+        assert!(valid.is_none());
+        assert!(partition_iterator.entry().is_none());
+    }
+
+    #[test]
+    fn test_partition_iterator_backward() {
+        let cfg = get_test_cfg();
+        let store = get_test_store(cfg.clone());
+        let partition_name = String::from("temppartition");
+        create_segment(1, partition_name.clone(), cfg.clone(), 1, store.clone());
+        create_segment(2, partition_name.clone(), cfg.clone(), 4, store.clone());
+        create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
+        create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
+        let mut partition_iterator =
+            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, true)
+                .unwrap()
+                .unwrap();
+        assert_eq!(partition_iterator.entry().unwrap().ts, 9);
+        partition_iterator.next();
+        partition_iterator.next();
+        assert_eq!(partition_iterator.entry().unwrap().ts, 6);
+        partition_iterator.next();
+        assert_eq!(partition_iterator.entry().unwrap().ts, 4);
+        partition_iterator.next();
+        assert_eq!(partition_iterator.entry().unwrap().ts, 3);
+        partition_iterator.next();
+        assert_eq!(partition_iterator.entry().unwrap().ts, 1);
         let valid = partition_iterator.next().unwrap();
         assert!(valid.is_none());
         assert!(partition_iterator.entry().is_none());
