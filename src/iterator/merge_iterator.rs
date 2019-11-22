@@ -66,7 +66,6 @@ impl<S: Store + Clone> MergeIteartor<S> {
                     // TODO: do it with your custom ordering
                     // Otherwise, It may be the time to do the
                     // heap thingy.
-                   
                     if entry.ts > prev_ts {
                         prev_ts = entry.ts;
                         inner_entry = Some(entry);
@@ -194,7 +193,7 @@ mod tests {
         }
     }
     #[test]
-      fn test_iterator_intersection_backward() {
+    fn test_iterator_intersection_backward() {
         let cfg = get_test_cfg();
         let store = get_test_store(cfg.clone()).clone();
         let mut itrs = Vec::new();
@@ -224,7 +223,7 @@ mod tests {
         let mut merge_itr = MergeIteartor::new(itrs, true).unwrap();
         let mut num = 8;
         loop {
-            let ent = merge_itr.entry().unwrap();   
+            let ent = merge_itr.entry().unwrap();
             assert_eq!(ent.ts, num);
             merge_itr.next().unwrap();
             num = num - 1;

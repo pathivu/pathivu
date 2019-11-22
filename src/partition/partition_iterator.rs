@@ -72,13 +72,12 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 filtered_segments.push(segment_file.clone());
             }
         }
-        if backward{
+        if backward {
             filtered_segments.reverse();
-        }else{
-        filtered_segments.sort();
+        } else {
+            filtered_segments.sort();
         }
 
-        
         let mut current_iterator = None;
         if filtered_segments.len() > 0 {
             let segment_file = filtered_segments.get(0).unwrap();
@@ -237,7 +236,7 @@ pub mod tests {
         assert!(partition_iterator.entry().is_none());
     }
 
-       #[test]
+    #[test]
     fn test_partition_iterator_backward() {
         let cfg = get_test_cfg();
         let store = get_test_store(cfg.clone());

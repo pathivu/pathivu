@@ -135,7 +135,7 @@ impl<S: Store> SegmentIterator<S> {
             }
             seen_set.insert(read_offset);
         }
-        if backward{
+        if backward {
             // If it is backward reverse indicies so that It'll come in descending order.
             entries.reverse();
         }
