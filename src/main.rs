@@ -25,6 +25,7 @@ mod server;
 mod store;
 mod types;
 mod util;
+mod replayer;
 use simplelog::*;
 fn main() {
     // CombinedLogger::init(vec![
