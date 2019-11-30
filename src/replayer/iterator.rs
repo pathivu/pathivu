@@ -21,29 +21,31 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 
 /// Iterator helps to iterate over entry in segment files.
-pub struct Iterator {
-    fs: File,
+pub struct Iterator<'a> {
+    fs: &'a File,
     size: u64,
     valid_offset: u64,
+    valid_entry_offset: u64,
 }
 
-impl Iterator {
+impl<'a> Iterator<'a> {
     /// new will give the iterator.
-    pub fn new(mut fs: File) -> Result<Iterator, Error> {
+    pub fn new(mut fs: &'a File) -> Result<Iterator<'a>, Error> {
         let info = fs.metadata()?;
         if info.len() < 14 {
             // layout itself not generated so, let's delete the file.
-            return Err(bail!("invalid segment file"));
+            return bail!("invalid segment file");
         }
         fs.seek(SeekFrom::Start(14))?;
         Ok(Iterator {
             fs: fs,
             size: info.len() as u64,
             valid_offset: 14,
+            valid_entry_offset: 14,
         })
     }
-    /// iterate will iterate entry of the segment file one by one.
-    pub fn iterate(&mut self) -> Result<Option<Entry>, Error> {
+    /// next will iterate entry of the segment file one by one.
+    pub fn next(&mut self) -> Result<Option<Entry>, Error> {
         if self.valid_offset + 8 > self.size {
             // we reached end of file. So, we'll truncate till valid offset.
             return Ok(None);
@@ -63,6 +65,10 @@ impl Iterator {
         self.fs.read(&mut entry_buf[..])?;
         current_offset = current_offset + entry_len;
         let entry = decode_entry(&entry_buf);
+        // entry offset is the entry starting offset. so
+        // we should always have track of previous valid offset.
+        // to ensure the current starting offset.
+        self.valid_entry_offset = self.valid_offset;
         // update the current valid offset.
         self.valid_offset = current_offset;
         Ok(Some(entry))
@@ -72,5 +78,9 @@ impl Iterator {
     /// It'll be used to truncate the segment file.
     pub fn valid_offset(&self) -> u64 {
         self.valid_offset
+    }
+    /// valid_entry_offset returns the current entry starting offset.
+    pub fn valid_entry_offset(&self) -> u64 {
+        self.valid_entry_offset
     }
 }

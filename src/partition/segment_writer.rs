@@ -210,6 +210,7 @@ impl<S: Store> SegmentWriter<S> {
             let mut registry_buf = Deserializer::new(&registry_buf[..]);
             partition_registry = Deserialize::deserialize(&mut registry_buf)?;
             partition_registry.segment_files.push(segment_file);
+            partition_registry.last_assigned = self.id;
         }
         let mut buf = Vec::with_capacity(1024);
         partition_registry

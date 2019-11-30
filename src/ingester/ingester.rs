@@ -144,7 +144,6 @@ impl<S: Store + Clone> Ingester<S> {
             .get(format!("{}_{}", PARTITION_PREFIX, partition).as_bytes())?;
         match partition_registry {
             Some(registry) => {
-                info!("some stuff is three");
                 let mut buf = Deserializer::new(&registry[..]);
                 let registry: PartitionRegistry = Deserialize::deserialize(&mut buf)?;
                 segment_id = registry.last_assigned + 1;

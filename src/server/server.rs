@@ -16,6 +16,7 @@
 use crate::config::config::Config;
 use crate::ingester::ingester::Ingester;
 use crate::queryexecutor::executor::QueryExecutor;
+use crate::replayer::replayer::Replayer;
 use crate::store::batch::Batch;
 use crate::store::rocks_store;
 use crate::store::store::Store;
@@ -44,14 +45,13 @@ use oldfuture::stream::Stream;
 use rocksdb::WriteBatch;
 use std::fs;
 use std::fs::create_dir_all;
+use std::marker::PhantomData;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::SystemTime;
-
-use std::marker::PhantomData;
 
 // A struct which can store the state which it needs.
 #[derive(Clone)]
@@ -284,6 +284,12 @@ impl Server {
             max_batch_size: 20,
         };
         let store = rocks_store::RocksStore::new(cfg.clone())?;
+
+        info!("replaying segment files");
+        let mut replayer = Replayer::new(cfg.clone(), store.clone());
+        replayer.replay()?;
+        drop(replayer);
+
         let (mut sender, receiver) = mpsc::channel(1000);
         let mut ingester = Ingester::new(receiver, cfg.clone(), store.clone());
         thread::spawn(move || {

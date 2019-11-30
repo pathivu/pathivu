@@ -27,5 +27,7 @@ fst-levenshtein = "0.2"
 rand = "0.7"
 tempfile = "3"
 nom = "5.0.1"
+rust-stemmers = "1.2.0"
+stopwords = "0.1.0"
 [dependencies.rocksdb]
 git = "https://github.com/pingcap/rust-rocksdb.git"
