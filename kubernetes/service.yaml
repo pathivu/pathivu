@@ -13,3 +13,6 @@ spec:
     - port: 5180
       name: http
       targetPort: 5180
+    - port: 6180
+      name: grpc
+      targetPort: 6180
