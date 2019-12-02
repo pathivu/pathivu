@@ -10,7 +10,7 @@ Cost-Effective logging at scale.
 
 Not for production use yet. But, you can play around it.
 
-[![asciicast](https://asciinema.org/a/5rc6hjDyJRn7btF5D3lD4vRnI.svg)](https://asciinema.org/a/5rc6hjDyJRn7btF5D3lD4vRnI)
+<p align="center"><img src="docs/tail.gif?raw=true"/></p>
 ## Usage
 First run pathivu in your cluster.
 
