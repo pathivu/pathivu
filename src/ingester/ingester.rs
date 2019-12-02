@@ -18,19 +18,24 @@ use crate::partition::segment_writer::SegmentWriter;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::*;
-use futures::channel::mpsc::Receiver;
+use futures::channel::mpsc::{Receiver, Sender};
 use futures::executor::block_on;
+use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use log::{debug, info, warn};
+use retain_mut::RetainMut;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tonic::Status;
+
 pub struct Ingester<S: Store> {
     receiver: Receiver<IngesterRequest>,
     id: u8,
     segment_writers: HashMap<String, SegmentWriter<S>>,
     cfg: Config,
     store: S,
+    tailers: HashMap<String, Vec<Sender<Result<api::QueryResponse, Status>>>>,
 }
 
 impl<S: Store + Clone> Ingester<S> {
@@ -41,6 +46,7 @@ impl<S: Store + Clone> Ingester<S> {
             segment_writers: HashMap::new(),
             cfg: cfg,
             store: store,
+            tailers: HashMap::default(),
         }
     }
 
@@ -55,6 +61,10 @@ impl<S: Store + Clone> Ingester<S> {
             let ingester_request = ingester_request.unwrap();
             match ingester_request {
                 IngesterRequest::Push(req) => {
+                    // first handle tailers.
+                    self.handle_tailers(&req);
+
+                    // now persist in the segment writer.
                     let result = self.push(&req.push_request.app, req.push_request.lines);
                     info!(" result {:?}", result);
                     match req.complete_signal.send(result) {
@@ -77,6 +87,9 @@ impl<S: Store + Clone> Ingester<S> {
 
                         _ => debug!("ingester necessary flush signal sent successfully"),
                     }
+                }
+                IngesterRequest::RegisterTailer(req) => {
+                    self.register_tailer(req);
                 }
             }
         }
@@ -157,5 +170,63 @@ impl<S: Store + Clone> Ingester<S> {
             self.store.clone(),
             start_ts,
         )
+    }
+
+    fn register_tailer(&mut self, mut req: TailerRequest) {
+        // push_tailer will push the tailer in the ingester tailer mapping.
+        let mut push_tailer =
+            |key: String, tailer: Sender<Result<api::QueryResponse, Status>>| match self
+                .tailers
+                .get_mut(&key)
+            {
+                Some(tailers) => tailers.push(tailer),
+                None => {
+                    self.tailers.insert(key, vec![tailer]);
+                }
+            };
+
+        if req.partitions.len() == 0 {
+            push_tailer(String::from("*"), req.sender);
+            return;
+        }
+
+        for partition in req.partitions.drain(..) {
+            push_tailer(partition, req.sender.clone());
+        }
+    }
+
+    fn handle_tailers(&mut self, req: &IngesterPush) {
+        // send_logs send logs to the respective listener stream.
+        let send_logs = |tailers: Option<&mut Vec<Sender<Result<api::QueryResponse, Status>>>>| {
+            if let Some(tailers) = tailers {
+                tailers.retain_mut(|tailer| {
+                    let mut lines = Vec::new();
+                    for log_line in req.push_request.lines.iter() {
+                        lines.push(api::LogLine {
+                            app: req.push_request.app.clone(),
+                            line: log_line.line.clone(),
+                            ts: log_line.ts,
+                        });
+                    }
+                    match block_on(async {
+                        tailer.send(Ok(api::QueryResponse { lines: lines })).await
+                    }) {
+                        Ok(_) => true,
+                        Err(_) => {
+                            println!("removing tailer");
+                            return false;
+                        }
+                    }
+                });
+            }
+        };
+
+        // First send for wildcards.
+        let tailers = self.tailers.get_mut("*");
+        send_logs(tailers);
+
+        // Then send it to the app specific listeners.
+        let tailers = self.tailers.get_mut(&req.push_request.app);
+        send_logs(tailers);
     }
 }

@@ -20,12 +20,13 @@ use crate::replayer::replayer::Replayer;
 use crate::store::batch::Batch;
 use crate::store::rocks_store;
 use crate::store::store::Store;
-use crate::types::types::{
-    IngesterPush, IngesterRequest, PartitionRes, PushRequest, QueryRequest, QueryResponse,
-};
+use crate::types::types::*;
+
+use api::server::PathivuServer;
 use failure::bail;
+use futures::channel::mpsc;
 use futures::channel::mpsc::Sender;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use futures::executor::block_on;
 use futures::sink::SinkExt;
 use gotham;
@@ -52,7 +53,84 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::SystemTime;
+use tokio::runtime::Runtime;
+use tonic;
+use tonic::{transport::Server as TonicServer, Code, Request, Response as TonicResponse, Status};
+struct PathivuGrpcServer {
+    ingester_transport: Sender<IngesterRequest>,
+    query_executor: QueryExecutor<rocks_store::RocksStore>,
+    partition_path: String,
+}
 
+#[tonic::async_trait]
+impl api::server::Pathivu for PathivuGrpcServer {
+    type TailStream = mpsc::Receiver<Result<api::QueryResponse, Status>>;
+
+    async fn tail(
+        &self,
+        req: Request<api::QueryRequest>,
+    ) -> Result<TonicResponse<Self::TailStream>, Status> {
+        let (mut tx, rx) = mpsc::channel(100);
+        let req = req.into_inner();
+        let tailer_req = TailerRequest {
+            partitions: req.partitions,
+            sender: tx,
+        };
+        let mut ingester_transport = self.ingester_transport.clone();
+        block_on(async {
+            ingester_transport
+                .send(IngesterRequest::RegisterTailer(tailer_req))
+                .await
+        });
+        Ok(TonicResponse::new(rx))
+    }
+
+    async fn query(
+        &self,
+        req: Request<api::QueryRequest>,
+    ) -> Result<TonicResponse<api::QueryResponse>, Status> {
+        let req = req.into_inner();
+        // convert into executor request.
+        let executor_req = QueryRequest {
+            partitions: req.partitions,
+            start_ts: req.start_ts,
+            end_ts: req.end_ts,
+            count: req.count,
+            offset: req.offset,
+            forward: req.forward,
+            query: req.query,
+        };
+        let mut executor = self.query_executor.clone();
+        let res = executor.execute(executor_req);
+        match res {
+            Ok(mut query_res) => {
+                // convert query response into grpc response.
+                let mut lines = Vec::new();
+                for line in query_res.lines.drain(..) {
+                    lines.push(api::LogLine {
+                        line: line.line,
+                        ts: line.ts,
+                        app: line.app,
+                    });
+                }
+                Ok(TonicResponse::new(api::QueryResponse { lines: lines }))
+            }
+            Err(err_msg) => Err(Status::new(Code::Internal, err_msg)),
+        }
+    }
+
+    async fn partitions(
+        &self,
+        _: Request<api::PartitionRequest>,
+    ) -> Result<TonicResponse<api::PartitionResponse>, Status> {
+        match get_partitions(&self.partition_path) {
+            Ok(partitions) => Ok(TonicResponse::new(api::PartitionResponse {
+                partitions: partitions,
+            })),
+            Err(e) => Err(Status::new(Code::Internal, format!("{}", e))),
+        }
+    }
+}
 // A struct which can store the state which it needs.
 #[derive(Clone)]
 struct PushHandler {
@@ -214,20 +292,27 @@ pub struct PartitionHandler {
     pub partition_path: String,
 }
 
+/// get_partitions returns partitions list that has been ingesterd into
+/// pathivu.
+fn get_partitions(path: &String) -> Result<Vec<String>, failure::Error> {
+    let path = Path::new(path).join("partition");
+    create_dir_all(&path)?;
+    let mut partitions = Vec::new();
+    let dir = fs::read_dir(&path)?;
+    for entry in dir {
+        match entry {
+            Ok(entry) => {
+                partitions.push(entry.file_name().into_string().unwrap());
+            }
+            Err(e) => bail!("{}", e),
+        }
+    }
+    return Ok(partitions);
+}
+
 impl PartitionHandler {
     pub fn partitions(&self) -> Result<PartitionRes, failure::Error> {
-        let path = Path::new(&self.partition_path).join("partition");
-        create_dir_all(&path)?;
-        let mut partitions = Vec::new();
-        let dir = fs::read_dir(&path)?;
-        for entry in dir {
-            match entry {
-                Ok(entry) => {
-                    partitions.push(entry.file_name().into_string().unwrap());
-                }
-                Err(e) => bail!("{}", e),
-            }
-        }
+        let partitions = get_partitions(&self.partition_path)?;
         Ok(PartitionRes {
             partitions: partitions,
         })
@@ -296,7 +381,25 @@ impl Server {
             ingester.start();
         });
         let executor = QueryExecutor::new(cfg.clone(), sender.clone(), store);
-        info!("chola lisenting on 5180");
+        let addr = "0.0.0.0:6180".parse().unwrap();
+        let pathivu_grpc = PathivuGrpcServer {
+            ingester_transport: sender.clone(),
+            query_executor: executor.clone(),
+            partition_path: cfg.dir.clone(),
+        };
+        thread::spawn(move || {
+            let mut rt = Runtime::new().unwrap();
+            rt.block_on(async {
+                println!("Listening pathivu grpc server on 6180");
+                TonicServer::builder()
+                    .add_service(PathivuServer::new(pathivu_grpc))
+                    .serve(addr)
+                    .await
+                    .unwrap();
+                (())
+            });
+        });
+        info!("pathivu lisenting on 5180");
         let addr = "0.0.0.0:5180";
         println!("Listening for requests at http://{}", addr);
         let router = build_simple_router(|route| {

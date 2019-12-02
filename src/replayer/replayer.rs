@@ -87,7 +87,7 @@ impl<'a, S: Store> Replayer<'a, S> {
             assert_eq!(entry_path.is_file(), true);
             // check whether it is fsa or segment file.
             let extension = entry_path.extension().unwrap();
-            if extension == "fsa" {
+            if extension == "fst" {
                 // There may be case where fsa file is created but
                 // index is not flushed. we need some mechanism to detect
                 // that or we could just check the size and build index

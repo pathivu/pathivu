@@ -14,10 +14,16 @@
  * limitations under the License.
  */
 use failure::Error;
+use futures::channel::mpsc;
 use futures::channel::oneshot::Sender;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
+use tonic::Status;
+pub mod api {
+    tonic::include_proto!("api"); // The string specified here must match the proto package name
+}
+use api::QueryResponse as PbQueryResponse;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogLine {
     pub line: String,
@@ -105,6 +111,12 @@ impl PartialEq for SegmentFile {
 pub enum IngesterRequest {
     Push(IngesterPush),
     Flush(IngesterFlushHintReq),
+    RegisterTailer(TailerRequest),
+}
+
+pub struct TailerRequest {
+    pub partitions: Vec<String>,
+    pub sender: mpsc::Sender<Result<PbQueryResponse, Status>>,
 }
 
 #[derive(Debug)]
