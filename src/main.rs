@@ -21,6 +21,7 @@ mod iterator;
 mod parser;
 mod partition;
 mod queryexecutor;
+mod replayer;
 mod server;
 mod store;
 mod types;

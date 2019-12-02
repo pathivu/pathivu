@@ -16,111 +16,74 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io/ioutil"
+	"katchi/api"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"time"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
 )
 
 type client struct {
-	host string
+	conn *grpc.ClientConn
 }
 
-// PartitionRes is reponse struct for partition
-type PartitionRes struct {
-	Partitions []string `json:"partitions"`
+func newClient(host string) *client {
+	conn, err := grpc.Dial(host, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	return &client{
+		conn: conn,
+	}
 }
 
-// QueryReq to collect logs
-type QueryReq struct {
-	Query      string   `json:"query"`
-	StartTs    int64    `json:"start_ts"`
-	EndTs      int64    `json:"end_ts"`
-	Count      int      `json:"count"`
-	Offset     int      `json:"offset"`
-	Partitions []string `json:"partitions"`
-	Forward    bool     `json:"forward"`
-}
-
-// Line is log line
-type Line struct {
-	Line string `json:"line"`
-	Ts   int64  `json:"ts"`
-	App  string `json:"app"`
-}
-
-// QueryRes log query response
-type QueryRes struct {
-	Lines []Line `json:"lines"`
+func (c *client) CloseConn() error {
+	return c.conn.Close()
 }
 
 func (c *client) partitions() []string {
-	url, err := url.Parse(host)
+	pathivuClient := api.NewPathivuClient(c.conn)
+	res, err := pathivuClient.Partitions(context.Background(), &api.PartitionRequest{})
 	if err != nil {
-		panic(err)
-	}
-	url.Path = path.Join(url.Path, "partitions")
-	resp, err := http.Get(url.String())
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-	res := &PartitionRes{}
-	if err = json.Unmarshal(body, res); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	return res.Partitions
 }
 
-func (c *client) query(reqBody *QueryReq) QueryRes {
-	if reqBody.Partitions == nil {
-		reqBody.Partitions = []string{}
-	}
-	url, err := url.Parse(host)
-	if err != nil {
-		panic(err)
-	}
-	url.Path = path.Join(url.Path, "query")
-
-	body, err := json.Marshal(reqBody)
+func (c *client) query(req *api.QueryRequest) *api.QueryResponse {
+	pathivuClient := api.NewPathivuClient(c.conn)
+	res, err := pathivuClient.Query(context.Background(), req)
 	if err != nil {
 		log.Fatal(err)
-	}
-	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(body))
-	if err != nil {
-		panic(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	resBody, _ := ioutil.ReadAll(resp.Body)
-	res := QueryRes{}
-	if err = json.Unmarshal(resBody, &res); err != nil {
-		panic(err)
 	}
 	return res
 }
 
+func (c *client) tail(partitions []string) {
+	req := &api.QueryRequest{
+		Partitions: partitions,
+	}
+	pathivuClient := api.NewPathivuClient(c.conn)
+	stream, err := pathivuClient.Tail(context.Background(), req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			log.Fatal(err)
+		}
+		printLogs(res.Lines)
+	}
+}
+
 var host string
 
-var req *QueryReq
+var req *api.QueryRequest
 
 var since time.Duration
 
@@ -130,8 +93,14 @@ var startTs int64
 
 var endTs int64
 
+func printLogs(lines []*api.LogLine) {
+	for _, line := range lines {
+		fmt.Printf("APP: %s, ts: %s, line: %s \n", line.App, time.Unix(int64(line.Ts), 0).String(), line.Line)
+	}
+}
+
 func main() {
-	req = new(QueryReq)
+	req = new(api.QueryRequest)
 	since = (time.Second * 0)
 	rootCmd := &cobra.Command{
 		Use:   "katchi",
@@ -139,30 +108,42 @@ func main() {
 		Long:  `katch is a cli tool for pathivu, which let's you folks to view all the logs in pathivu`,
 	}
 	var queryCmd = &cobra.Command{
-		Use:   "logs --partitions=kube-server,api-server --since=3h --query=info",
+		Use:   "logs --apps=kube-server --partitions=api-server --since=3h --query=info",
 		Short: "query logs ",
 		Long:  `query logs in the pathivu server`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
 				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
 			}
-			c := &client{
-				host: host,
-			}
+			c := newClient(host)
+			defer c.CloseConn()
 			req.Partitions = partitions
 			if since.Seconds() != 0 {
-				req.StartTs = time.Now().Add(-since).Unix()
-				req.EndTs = time.Now().Unix()
+				req.StartTs = uint64(time.Now().Add(-since).Unix())
+				req.EndTs = uint64(time.Now().Unix())
 			}
 			req.Forward = false
 			res := c.query(req)
-			for _, line := range res.Lines {
-				fmt.Printf("APP: %s, ts: %s, line: %s \n", line.App, time.Unix(line.Ts, 0).String(), line.Line)
-			}
+			printLogs(res.Lines)
 		},
 	}
 	queryCmd.Flags().DurationVar(&since, "since", time.Second*0, "since=1h")
-	queryCmd.Flags().StringArrayVar(&partitions, "apps", []string{}, "apps=kubeserver,api-server")
+	queryCmd.Flags().StringArrayVar(&partitions, "apps", []string{}, "apps=kubeserver")
+
+	var tailCmd = &cobra.Command{
+		Use:   "tail --apps=kube-server  --apps=api-server",
+		Short: "tail all the apps",
+		Long:  "tail logs of the specified apps",
+		Run: func(cmd *cobra.Command, args []string) {
+			if host == "" {
+				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+			}
+			c := newClient(host)
+			defer c.CloseConn()
+			c.tail(partitions)
+		},
+	}
+	tailCmd.Flags().StringArrayVar(&partitions, "apps", []string{}, "apps=kubeserver")
 
 	partitionCmd := &cobra.Command{
 		Use:   "apps",
@@ -170,11 +151,10 @@ func main() {
 		Long:  `apps gives all the app name of logs that has been ingested in the pathivu`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("katch is a cli tool for pathivu, which let's you folks to view all the logs in pathivuhost name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
 			}
-			c := &client{
-				host: host,
-			}
+			c := newClient(host)
+			defer c.CloseConn()
 			partitons := c.partitions()
 			fmt.Println("App Names")
 			for _, app := range partitons {
@@ -185,5 +165,6 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&host, "host", os.Getenv("pathivu_HOST"), "pathivu host address")
 	rootCmd.AddCommand(queryCmd)
 	rootCmd.AddCommand(partitionCmd)
+	rootCmd.AddCommand(tailCmd)
 	rootCmd.Execute()
 }
