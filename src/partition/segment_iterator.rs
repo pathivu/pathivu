@@ -35,6 +35,7 @@ use std::time::Duration;
 pub struct Entry {
     pub line: Vec<u8>,
     pub ts: u64,
+    pub structured: u8,
 }
 
 // SegmentIterator is used to iterate over segment files.
@@ -176,6 +177,7 @@ pub fn decode_entry(line_buf: &[u8]) -> Entry {
     let ts = decode_u64(&line_buf[..8]);
     Entry {
         ts: ts,
-        line: line_buf[8..].to_vec(),
+        structured: line_buf[9],
+        line: line_buf[9..].to_vec(),
     }
 }

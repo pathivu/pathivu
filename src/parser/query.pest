@@ -1,0 +1,9 @@
+unstructred = {"message" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ ASCII_ALPHANUMERIC+}
+flattend_key = {(ASCII_ALPHANUMERIC+ ~".")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+}
+structured = {flattend_key+ ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ ASCII_ALPHANUMERIC+}
+source = {"source" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~  ((ASCII_ALPHANUMERIC+ ~",")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+)}
+count = {"count("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+ | (" by " ~ ASCII_ALPHANUMERIC+)}
+distinct = {"distinct("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+}
+distinct_unique = {"distinct_unique("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+}
+average = {"avg("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+ | (" by " ~ ASCII_ALPHANUMERIC+)}
+query = { SOI ~ (source | count | distinct|distinct_unique|average |unstructred|structured )? ~ (" | "~(source | count | distinct|distinct_unique|average | unstructred | structured))? ~ EOI }

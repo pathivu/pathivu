@@ -194,6 +194,8 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: start_ts,
+            json: false,
+            json_keys: Vec::default(),
         });
         lines.push(LogLine {
             line: format!("liala transfered {} money to raja", start_ts + 300),
@@ -204,6 +206,8 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: start_ts + 2,
+            json: false,
+            json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();
         segment_writer.close().unwrap();

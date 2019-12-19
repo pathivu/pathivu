@@ -17,7 +17,8 @@ use crate::config::config::Config;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::{
-    LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL, SEGMENT_PREFIX,
+    LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL,
+    SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
 use failure::{bail, Error};
@@ -53,7 +54,8 @@ pub struct SegmentWriter<S> {
     start_ts: u64,
     end_ts: u64,
     batch_count: usize,
-    posting_list: HashMap<String, Vec<u8>>,
+    index_posting_list: HashMap<String, Vec<u8>>,
+    json_key_posting_list: HashMap<String, Vec<u8>>,
     index_size: usize,
     entry_offsets: Vec<u8>,
     flushed_offset: u64,
@@ -94,7 +96,8 @@ impl<S: Store> SegmentWriter<S> {
             start_ts: start_ts,
             end_ts: start_ts,
             batch_count: 0,
-            posting_list: HashMap::default(),
+            index_posting_list: HashMap::default(),
+            json_key_posting_list: HashMap::default(),
             index_size: 0,
             entry_offsets: Vec::new(),
             flushed_offset: file_index,
@@ -139,13 +142,25 @@ impl<S: Store> SegmentWriter<S> {
             self.entry_offsets.extend(line_offset.to_vec());
             for term in indexes {
                 self.index_size = self.index_size + term.len();
-                if let Some(posting_list) = self.posting_list.get_mut(&term) {
+                if let Some(posting_list) = self.index_posting_list.get_mut(&term) {
                     posting_list.extend(line_offset.to_vec().iter());
                 } else {
-                    self.posting_list.insert(term.clone(), line_offset.to_vec());
+                    self.index_posting_list
+                        .insert(term.clone(), line_offset.to_vec());
                 }
             }
-            let entry_length = (line_buf.len() + ts_buf.len()) as u64;
+
+            // Populate posting list of json keys as well.
+            let json_keys = log_line.json_keys.drain(0..log_line.json_keys.len());
+            for key in json_keys {
+                if let Some(posting_list) = self.json_key_posting_list.get_mut(&key) {
+                    posting_list.extend(line_offset.to_vec().iter());
+                } else {
+                    self.json_key_posting_list.insert(key, line_offset.to_vec());
+                }
+            }
+            // TS LENGTH + STRUCTURED KEY + LINE LENGTH.
+            let entry_length = (line_buf.len() + ts_buf.len() + 1) as u64;
             // advance the file offset.
             self.file_offset = self.file_offset + entry_length + 8;
             // encode entry length.
@@ -153,6 +168,12 @@ impl<S: Store> SegmentWriter<S> {
             len_buf.as_mut().write_u64::<LittleEndian>(entry_length);
             buf.push(len_buf.to_vec());
             buf.push(ts_buf.to_vec());
+            // If it is json set the 1 otherwise set 0.
+            if log_line.json {
+                buf.push(vec![1]);
+            } else {
+                buf.push(vec![0]);
+            }
             // index this line.
             buf.push(line_buf);
             // advance line ts.
@@ -223,7 +244,7 @@ impl<S: Store> SegmentWriter<S> {
         // insert posting list.
         let mut indices = Vec::new();
         let mut wb = Batch::new();
-        let posting_list = self.posting_list.drain();
+        let posting_list = self.index_posting_list.drain();
         for (index, list) in posting_list {
             wb.set(
                 format!(
@@ -235,6 +256,19 @@ impl<S: Store> SegmentWriter<S> {
             )
             .unwrap();
             indices.push(index);
+        }
+        // Insert json key posting list.
+        let posting_list = self.json_key_posting_list.drain();
+        for (key, list) in posting_list {
+            wb.set(
+                format!(
+                    "{}_{}_{}_{}",
+                    SEGEMENT_JSON_KEY_PREFIX, self.partition, self.id, &key
+                )
+                .into_bytes(),
+                list,
+            )
+            .unwrap();
         }
         wb.set(
             format!(
@@ -332,6 +366,8 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
+            json: false,
+            json_keys: Vec::new(),
         });
         lines.push(LogLine {
             line: String::from("roja transfered money to navin"),
@@ -342,6 +378,8 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
+            json: false,
+            json_keys: Vec::new(),
         });
         segment_writer.push(lines);
         // check the end ts.
@@ -349,7 +387,7 @@ pub mod tests {
         // check all the entry offset.
         assert_eq!(segment_writer.entry_offsets.len(), 16);
         // check posint list length.
-        assert_eq!(segment_writer.posting_list.len(), 6);
+        assert_eq!(segment_writer.index_posting_list.len(), 6);
         segment_writer.close().unwrap();
         let partition_path = Path::new(&cfg.dir).join("partition").join("tmppartition");
         let mut iterator = SegmentIterator::new(

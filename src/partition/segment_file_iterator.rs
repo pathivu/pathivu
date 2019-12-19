@@ -113,6 +113,8 @@ mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
+            json: false,
+            json_keys: Vec::default(),
         });
         lines.push(LogLine {
             line: String::from("roja transfered money to navin"),
@@ -123,6 +125,8 @@ mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
+            json: false,
+            json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();
         segment_writer.flush().unwrap();
