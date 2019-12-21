@@ -13,24 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::config::config::Config;
 use crate::partition::iterator::Iterator;
 use crate::partition::posting_list;
-use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::{POSTING_LIST_ALL, SEGMENT_PREFIX};
 use crate::util::decode_u64;
 use failure;
-use failure::bail;
-use fst::{IntoStreamer, Set, Streamer};
+use fst::{IntoStreamer, Set};
 use fst_levenshtein::Levenshtein;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
-use std::marker::PhantomData;
 use std::path;
 use std::rc::Rc;
-use std::time::Duration;
 #[derive(Debug)]
 pub struct Entry {
     pub line: Vec<u8>,

@@ -1,9 +1,22 @@
-unstructred = {"message" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ ASCII_ALPHANUMERIC+}
+unstructured = {"message" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ string}
 flattend_key = {(ASCII_ALPHANUMERIC+ ~".")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+}
-structured = {flattend_key+ ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ ASCII_ALPHANUMERIC+}
-source = {"source" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~  ((ASCII_ALPHANUMERIC+ ~",")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+)}
-count = {"count("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+ | (" by " ~ ASCII_ALPHANUMERIC+)}
-distinct = {"distinct("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+}
-distinct_unique = {"distinct_unique("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+}
-average = {"avg("~ASCII_ALPHANUMERIC+~") as "~ASCII_ALPHANUMERIC+ | (" by " ~ ASCII_ALPHANUMERIC+)}
-query = { SOI ~ (source | count | distinct|distinct_unique|average |unstructred|structured )? ~ (" | "~(source | count | distinct|distinct_unique|average | unstructred | structured))? ~ EOI }
+structured = {flattend_key+ ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ string}
+source = {"source" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~  ((variable ~",")+ ~ variable | variable)}
+count = {("count("~variable~") as "~variable ~" by " ~ variable)| 
+ ("count("~variable~") as "~variable)}
+distinct = {"distinct("~variable~") as "~variable}
+string = ${ "\"" ~ inner ~ "\"" }
+char = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+inner = @{ char* }
+variable = {(ASCII_ALPHANUMERIC+ ~"_")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+}
+distinct_count = {"distinct_count("~variable~") as "~variable}
+average = {("avg("~variable+~") as "~variable+ ~ " by " ~ variable) | ("avg("~variable+~") as "~variable)}
+number = {DECIMAL_NUMBER+}
+limit = {"limit "~ number}
+query_block = {source | count | distinct|distinct_count|average | limit| unstructured | structured}
+query = { (query_block ~ " | " ~query ~EOI) | (query_block ~ EOI) }
