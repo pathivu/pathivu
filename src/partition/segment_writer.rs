@@ -326,6 +326,7 @@ impl<S: Store> SegmentWriter<S> {
 pub mod tests {
     use super::*;
     use crate::config::config::Config;
+    use crate::parser::parser::Selection;
     use crate::partition::iterator::Iterator;
     use crate::partition::segment_iterator::SegmentIterator;
     use crate::store::rocks_store::RocksStore;
@@ -394,7 +395,7 @@ pub mod tests {
             1,
             partition_path.clone(),
             store.clone(),
-            String::from(""),
+            None,
             String::from("tmppartition"),
             1,
             5,
@@ -415,7 +416,11 @@ pub mod tests {
             1,
             partition_path,
             store,
-            String::from("navi"),
+            Some(Selection {
+                value: String::from("navi"),
+                attr: None,
+                structured: false,
+            }),
             String::from("tmppartition"),
             1,
             5,

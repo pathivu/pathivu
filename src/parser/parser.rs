@@ -6,14 +6,14 @@ use failure::format_err;
 use failure::Error;
 use pest::iterators::Pair;
 #[derive(Parser)]
-#[grammar = "/home/schoolboy/pathivu/src/parser/query.pest"]
+#[grammar = "parser/query.pest"]
 struct QueryParser;
 
 /// default log line limit.
 const DEFAULT_LIMIT: u64 = 10000;
 
 /// Selection hold the selection statement.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Selection {
     pub structured: bool,
     pub attr: Option<String>,

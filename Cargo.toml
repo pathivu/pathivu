@@ -33,6 +33,7 @@ tonic = "0.1.0-alpha.6"
 prost = "0.5.0"
 tokio = "=0.2.0-alpha.6"
 retain_mut = "0.1.0"
+array_tool = "1.0.3"
 # Required for wellknown types
 prost-types = "0.5"
 pest = "2.0"

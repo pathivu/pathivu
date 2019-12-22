@@ -15,17 +15,20 @@
  */
 use crate::config::config::Config;
 use crate::iterator::merge_iterator::MergeIteartor;
+use crate::parser::parser;
 use crate::partition::partition_iterator::PartitionIterator;
 use crate::server::server::PartitionHandler;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::{IngesterFlushHintReq, IngesterRequest};
 use crate::types::types::{QueryRequest, QueryResponse, ResLine};
+use failure::format_err;
 use futures::channel::mpsc::Sender;
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use futures::sink::SinkExt;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::rc::Rc;
 pub struct QueryExecutor<S: Store + Clone> {
@@ -89,7 +92,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
                 partition,
                 req.start_ts,
                 req.end_ts,
-                req.query.clone(),
+                None,
                 self.store.clone(),
                 self.cfg.clone(),
                 !req.forward,
@@ -128,6 +131,88 @@ impl<S: Store + Clone> QueryExecutor<S> {
             }
         }
         Ok(QueryResponse { lines: lines })
+    }
+
+    pub fn execute_sql_query(
+        &mut self,
+        query: String,
+        start_ts: u64,
+        end_ts: u64,
+        forward: bool,
+    ) -> Result<(), failure::Error> {
+        let query = parser::parse(query)?;
+        let mut itrs = Vec::new();
+        let mut partitions = query.soruces;
+        // If there is no partitions mentioned then we have to query all
+        // the partitions.
+        if partitions.len() == 0 {
+            let result = self.partition_handler.partitions();
+            if result.is_err() {
+                return Err(format_err!("{}", result.unwrap_err()));
+            }
+            partitions = result.unwrap().partitions;
+        }
+        for partition in partitions {
+            // let the ingester know that we may need the segments. So, sending
+            // hint to the ingester so that it'll flush the buffered segement :)
+            // Do you hava any smart way? pls do it here.
+
+            let (complete_sender, complete_receiver) = oneshot::channel();
+            let hint = IngesterFlushHintReq {
+                app: partition.clone(),
+                start_ts: start_ts,
+                end_ts: end_ts,
+                complete_signal: complete_sender,
+            };
+            block_on(async {
+                self.ingester_transport
+                    .send(IngesterRequest::Flush(hint))
+                    .await
+                    .unwrap();
+                if let Err(e) = complete_receiver.await {
+                    return Err(format_err!("{}", e));
+                }
+                Ok(())
+            })?;
+
+            // no need to copy store every time. we can do the partition registry
+            // retrival here. we can replace, if it is show in the profiles.
+            let itr = PartitionIterator::new(
+                partition,
+                start_ts,
+                end_ts,
+                None,
+                self.store.clone(),
+                self.cfg.clone(),
+                !forward,
+            );
+            // some error happened.
+            if let Err(e) = itr {
+                return Err(format_err!("{}", e));
+            }
+            let itr = itr.unwrap();
+            // no segement files for the given partition.
+            if let None = itr {
+                continue;
+            }
+            itrs.push(Rc::new(RefCell::new(itr.unwrap())));
+        }
+        let itr = MergeIteartor::new(itrs, !forward);
+        if let Err(e) = itr {
+            return Err(format_err!("{}", e));
+        }
+        let mut itr = itr.unwrap();
+        // We got all the log lines. from here we'll execute the query
+        // and parse the json.
+
+        if let Some(distinct) = query.distinct {
+            // Find the distinct values for the given attribute.
+        }
+        Ok(())
+    }
+
+    fn handle_distinct(&self, itr: &MergeIteartor<S>, distinct: parser::Distinct) {
+        let distinct_map = HashMap::new();
     }
 }
 

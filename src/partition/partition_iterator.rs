@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 use crate::config::config::Config;
+use crate::parser::parser::Selection;
 use crate::partition::iterator::Iterator;
 use crate::partition::segment_iterator::Entry;
 use crate::partition::segment_iterator::SegmentIterator;
@@ -36,7 +37,7 @@ pub struct PartitionIterator<S> {
     current_iterator: Option<SegmentIterator<S>>,
     cfg: Config,
     partition: String,
-    query: String,
+    selection: Option<Selection>,
     start_ts: u64,
     end_ts: u64,
     backward: bool,
@@ -48,7 +49,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         partition: String,
         start_ts: u64,
         end_ts: u64,
-        query: String,
+        selection: Option<Selection>,
         store: S,
         cfg: Config,
         backward: bool,
@@ -86,7 +87,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 segment_file.id,
                 partition_path,
                 store.clone(),
-                query.clone(),
+                selection.clone(),
                 partition.clone(),
                 start_ts,
                 end_ts,
@@ -101,7 +102,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             cfg: cfg,
             current_iterator: current_iterator,
             partition: partition,
-            query: query,
+            selection: selection,
             start_ts: start_ts,
             end_ts: end_ts,
             backward: backward,
@@ -148,7 +149,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             segment_file.id,
             partition_path,
             self.store.clone(),
-            self.query.clone(),
+            self.selection.clone(),
             self.partition.clone(),
             self.start_ts,
             self.end_ts,
@@ -222,7 +223,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, false)
+            PartitionIterator::new(partition_name, 1, 9, None, store, cfg, false)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);
@@ -250,7 +251,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, true)
+            PartitionIterator::new(partition_name, 1, 9, None, store, cfg, true)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 9);
