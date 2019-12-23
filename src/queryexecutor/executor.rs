@@ -212,7 +212,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
     }
 
     fn handle_distinct(&self, itr: &MergeIteartor<S>, distinct: parser::Distinct) {
-        let distinct_map = HashMap::new();
+        //   let distinct_map = HashMap::new();
     }
 }
 

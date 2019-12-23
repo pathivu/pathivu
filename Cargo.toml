@@ -38,6 +38,7 @@ array_tool = "1.0.3"
 prost-types = "0.5"
 pest = "2.0"
 pest_derive = "2.0"
+simd-json = "0.2.2"
 
 [dependencies.rocksdb]
 git = "https://github.com/pingcap/rust-rocksdb.git"

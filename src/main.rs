@@ -18,6 +18,7 @@
 mod config;
 mod ingester;
 mod iterator;
+mod json_parser;
 mod parser;
 mod partition;
 mod queryexecutor;
