@@ -15,8 +15,10 @@
  */
 use crate::config::config::Config;
 use crate::iterator::merge_iterator::MergeIteartor;
+use crate::json_parser::parser::get_value_from_json;
 use crate::parser::parser;
 use crate::partition::partition_iterator::PartitionIterator;
+use crate::partition::segment_iterator::Entry;
 use crate::server::server::PartitionHandler;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
@@ -212,7 +214,38 @@ impl<S: Store + Clone> QueryExecutor<S> {
     }
 
     fn handle_distinct(&self, itr: &MergeIteartor<S>, distinct: parser::Distinct) {
-        //   let distinct_map = HashMap::new();
+        let distinct_map = HashMap::new();
+        let key_for_distinct_lookup = distinct.attr;
+
+        let cb = |distinct_map: &HashMap<String, u64>| {
+            return |entry: Rc<Entry>| {
+                // Ingore all the unstructred logs.
+                if entry.structured != 1 {
+                    return;
+                }
+                match get_value_from_json(key_for_distinct_lookup.clone(), &mut entry.line) {
+                    Err(e) => {}
+                }
+            };
+        };
+    }
+    /// loop over iterator is used to iterate over all the entries of the
+    /// given iterator and the each entry is passed to the given callback.
+    fn loop_over_iterator(
+        &self,
+        itr: &MergeIteartor<S>,
+        cb: Box<dyn Fn(Rc<Entry>)>,
+    ) -> Result<(), failure::Error> {
+        loop {
+            match itr.entry() {
+                None => break,
+                Some(entry) => {
+                    cb(entry);
+                    itr.next()?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
