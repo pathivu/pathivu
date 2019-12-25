@@ -66,7 +66,7 @@ pub struct Query {
     pub selection: Option<Selection>,
     pub count: Option<Count>,
     pub distinct: Option<Distinct>,
-    pub aggregation_exist: bool, // Pathivu only accepts only
+    pub aggregation_exist: bool, // Pathivu only accepts only one aggregation. Atleast for now.
     pub average: Option<Average>,
     pub soruces: Vec<String>,
     pub limit: u64,

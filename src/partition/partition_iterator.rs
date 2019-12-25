@@ -80,6 +80,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         }
 
         let mut current_iterator = None;
+        // TODO: we should return None if there is no segment files.
         if filtered_segments.len() > 0 {
             let segment_file = filtered_segments.get(0).unwrap();
             let partition_path = Path::new(&cfg.dir).join("partition").join(&partition);

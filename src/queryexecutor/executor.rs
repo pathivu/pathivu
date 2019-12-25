@@ -221,6 +221,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
         Ok(())
     }
 
+    /// handle distinct gives the distinct count of the given log lines based on the query attr.
     fn handle_distinct(
         &self,
         itr: &mut MergeIteartor<S>,
@@ -230,6 +231,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
         let key_for_distinct_lookup = &distinct.attr;
         let mut distinct_map: HashMap<String, u64> = HashMap::default();
         self.loop_over_iterator(itr, |entry| {
+            println!("{:?}", entry);
             // Ingore all the unstructred logs.
             if entry.structured != 1 {
                 return Ok(());
@@ -253,6 +255,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
                     if let Some(val) = result {
                         match val {
                             Value::String(key) => {
+                                println!("{:?}", key);
                                 let key = key.into_owned();
                                 count_distinct(key);
                             }
@@ -313,5 +316,164 @@ impl<S: Store + Clone> Clone for QueryExecutor<S> {
             ingester_transport: self.ingester_transport.clone(),
             partition_handler: self.partition_handler.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::config::config::Config;
+    use crate::iterator::merge_iterator::MergeIteartor;
+    use crate::parser::*;
+    use crate::partition::partition_iterator::PartitionIterator;
+    use crate::partition::segment_writer::tests::{get_test_cfg, get_test_store};
+    use crate::partition::segment_writer::SegmentWriter;
+    use crate::store::rocks_store::RocksStore;
+    use crate::types::types::api::PushLogLine;
+    use futures::channel::mpsc;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    // get_merge_iterator returns merge iterator fot the given log lines.
+    fn get_merge_iterator(
+        cfg: Config,
+        store: RocksStore,
+        lines: Vec<PushLogLine>,
+    ) -> MergeIteartor<RocksStore> {
+        let mut segment_writer = SegmentWriter::new(
+            cfg.clone(),
+            String::from("tmppartition"),
+            1,
+            store.clone(),
+            2,
+        )
+        .unwrap();
+        segment_writer.push(lines).unwrap();
+        segment_writer.flush().unwrap();
+        segment_writer.close();
+
+        // Create iterator for the given segment.
+        let iterator = PartitionIterator::new(
+            String::from("tmppartition"),
+            1,
+            9,
+            None,
+            store.clone(),
+            cfg.clone(),
+            false,
+        )
+        .unwrap();
+        MergeIteartor::new(vec![Rc::new(RefCell::new(iterator.unwrap()))], false).unwrap()
+    }
+    // Test distinct
+    #[test]
+    fn test_distinct() {
+        let cfg = get_test_cfg();
+        let store = get_test_store(cfg.clone()).clone();
+        // Create log lines.
+        let mut lines = Vec::new();
+        lines.push(PushLogLine {
+            raw_data: br#"{
+            "name": "Licenser",
+            "skills": {
+                "language": "Rust",
+                "yo": {
+                    "age": 1
+                },
+                "la": ["yo","yo1"]
+            }
+        }"#
+            .to_vec(),
+            indexes: Vec::new(),
+            ts: 2,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+        lines.push(PushLogLine {
+            raw_data: br#"{
+            "name": "Licenser",
+            "skills": {
+                "language": "Go",
+                "yo": {
+                    "age": 1
+                },
+                "la": ["yo","yo1"]
+            }
+        }"#
+            .to_vec(),
+            indexes: Vec::new(),
+            ts: 3,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+        lines.push(PushLogLine {
+            raw_data: br#"{
+            "name": "Licenser",
+            "skills": {
+                "language": "Ruby",
+                "yo": {
+                    "age": 1
+                },
+                "la": ["yo","yo1"]
+            }
+        }"#
+            .to_vec(),
+            indexes: Vec::new(),
+            ts: 4,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+        lines.push(PushLogLine {
+            raw_data: br#"{
+            "name": "Licenser",
+            "skills": {
+                "language": "Rust",
+                "yo": {
+                    "age": 1
+                },
+                "la": ["yo","yo1"]
+            }
+        }"#
+            .to_vec(),
+            indexes: Vec::new(),
+            ts: 5,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+        lines.push(PushLogLine {
+            raw_data: br#"{
+            "name": "Licenser",
+            "skills": {
+                "language": "Go",
+                "yo": {
+                    "age": 1
+                },
+                "la": ["yo","yo1"]
+            }
+        }"#
+            .to_vec(),
+            indexes: Vec::new(),
+            ts: 7,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+
+        // create merge iterator for the log lines.
+        let mut itr = get_merge_iterator(cfg.clone(), store.clone(), lines);
+
+        // create dummy transport for the executor
+        let (sender, _) = mpsc::channel(1000);
+        // Create executor to test the query.
+        let mut executor = QueryExecutor::new(cfg, sender, store);
+
+        let distinct = parser::Distinct {
+            attr: "skills.language".to_string(),
+            alias: "languages".to_string(),
+            count: false,
+        };
+
+        let distinct_map = executor.handle_distinct(&mut itr, &distinct).unwrap();
+
+        assert_eq!(distinct_map.len(), 3);
     }
 }
