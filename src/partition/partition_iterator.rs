@@ -176,6 +176,7 @@ pub mod tests {
     use crate::partition::segment_writer::SegmentWriter;
     use crate::store::rocks_store::RocksStore;
     use crate::store::store::Store;
+    use crate::types::types::api::PushLogLine;
     use crate::types::types::{LogLine, PartitionRegistry, PARTITION_PREFIX};
     pub fn create_segment(
         id: u64,
@@ -186,8 +187,8 @@ pub mod tests {
     ) {
         let mut segment_writer = SegmentWriter::new(cfg, partition, id, store, start_ts).unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: format!("liala transfered {} money to raja", start_ts + 100),
+        lines.push(PushLogLine {
+            raw_data: format!("liala transfered {} money to raja", start_ts + 100).into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -195,11 +196,11 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: start_ts,
-            json: false,
+            structured: false,
             json_keys: Vec::default(),
         });
-        lines.push(LogLine {
-            line: format!("liala transfered {} money to raja", start_ts + 300),
+        lines.push(PushLogLine {
+            raw_data: format!("liala transfered {} money to raja", start_ts + 300).into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -207,7 +208,7 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: start_ts + 2,
-            json: false,
+            structured: false,
             json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();

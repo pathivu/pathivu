@@ -16,6 +16,7 @@
 use crate::config::config::Config;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
+use crate::types::types;
 use crate::types::types::{
     LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL,
     SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX,
@@ -47,7 +48,7 @@ pub struct SegmentWriter<S> {
     pub partition: String,
     config: Config,
     segment_file: File,
-    batch: Vec<LogLine>,
+    batch: Vec<types::api::PushLogLine>,
     file_offset: u64,
     store: S,
     id: u64,
@@ -107,7 +108,7 @@ impl<S: Store> SegmentWriter<S> {
     /// push pushes logline and terms of the logline. terms are used to index the line's file
     /// offset. push will essentially batch all the line. Once the batch size reached, it'll
     /// flush the line to the file.
-    pub fn push(&mut self, mut lines: Vec<LogLine>) -> Result<(), Error> {
+    pub fn push(&mut self, mut lines: Vec<types::api::PushLogLine>) -> Result<(), Error> {
         // encoding line length.
         let drain = lines.drain(0..lines.len());
         for line in drain {
@@ -132,7 +133,7 @@ impl<S: Store> SegmentWriter<S> {
                 .as_mut()
                 .write_u64::<LittleEndian>(self.file_offset);
             // Encode log line.
-            let line_buf = log_line.line.into_bytes();
+            let line_buf = log_line.raw_data;
             // Encode time stamp.
             let mut ts_buf = [0u8; mem::size_of::<u64>()];
             ts_buf.as_mut().write_u64::<LittleEndian>(log_line.ts);
@@ -169,7 +170,7 @@ impl<S: Store> SegmentWriter<S> {
             buf.push(len_buf.to_vec());
             buf.push(ts_buf.to_vec());
             // If it is json set the 1 otherwise set 0.
-            if log_line.json {
+            if log_line.structured {
                 buf.push(vec![1]);
             } else {
                 buf.push(vec![0]);
@@ -330,6 +331,7 @@ pub mod tests {
     use crate::partition::iterator::Iterator;
     use crate::partition::segment_iterator::SegmentIterator;
     use crate::store::rocks_store::RocksStore;
+    use crate::types::types::api::PushLogLine;
     use crate::types::types::LogLine;
     use std::path::Path;
     use tempfile;
@@ -358,8 +360,8 @@ pub mod tests {
         )
         .unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: String::from("liala transfered money to raja"),
+        lines.push(PushLogLine {
+            raw_data: String::from("liala transfered money to raja").into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -367,11 +369,11 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
-            json: false,
+            structured: false,
             json_keys: Vec::new(),
         });
-        lines.push(LogLine {
-            line: String::from("roja transfered money to navin"),
+        lines.push(PushLogLine {
+            raw_data: String::from("roja transfered money to navin").into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -379,7 +381,7 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
-            json: false,
+            structured: false,
             json_keys: Vec::new(),
         });
         segment_writer.push(lines);

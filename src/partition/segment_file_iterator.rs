@@ -90,7 +90,7 @@ mod tests {
     use crate::partition::segment_file_iterator::FileIterator;
     use crate::partition::segment_writer::tests::{get_test_cfg, get_test_store};
     use crate::partition::segment_writer::SegmentWriter;
-    use crate::types::types::LogLine;
+    use crate::types::types::api::PushLogLine;
     #[test]
     fn test_file_iterator() {
         let cfg = get_test_cfg();
@@ -104,8 +104,8 @@ mod tests {
         )
         .unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: String::from("liala transfered money to raja"),
+        lines.push(PushLogLine {
+            raw_data: String::from("liala transfered money to raja").into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -113,11 +113,11 @@ mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
-            json: false,
+            structured: false,
             json_keys: Vec::default(),
         });
-        lines.push(LogLine {
-            line: String::from("roja transfered money to navin"),
+        lines.push(PushLogLine {
+            raw_data: String::from("roja transfered money to navin").into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -125,7 +125,7 @@ mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
-            json: false,
+            structured: false,
             json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();

@@ -105,15 +105,16 @@ impl api::server::Pathivu for PathivuGrpcServer {
         match res {
             Ok(mut query_res) => {
                 // convert query response into grpc response.
-                let mut lines = Vec::new();
-                for line in query_res.lines.drain(..) {
-                    lines.push(api::LogLine {
-                        line: line.line,
-                        ts: line.ts,
-                        app: line.app,
-                    });
-                }
-                Ok(TonicResponse::new(api::QueryResponse { lines: lines }))
+                // let mut lines = Vec::new();
+                // for line in query_res.lines.drain(..) {
+                //     lines.push(api::LogLine {
+                //         line: line.line,
+                //         ts: line.ts,
+                //         app: line.app,
+                //     });
+                // }
+                // JSON needs to be changed here
+                Ok(TonicResponse::new(api::QueryResponse::default()))
             }
             Err(err_msg) => Err(Status::new(Code::Internal, err_msg)),
         }

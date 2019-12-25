@@ -28,9 +28,7 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tonic::Status;
-pub mod api {
-    tonic::include_proto!("api"); // The string specified here must match the proto package name
-}
+
 pub struct Ingester<S: Store> {
     receiver: Receiver<IngesterRequest>,
     id: u8,
@@ -67,7 +65,7 @@ impl<S: Store + Clone> Ingester<S> {
                     self.handle_tailers(&req);
 
                     // now persist in the segment writer.
-                    let result = self.push(req);
+                    let result = self.push(req.push_request);
                     info!(" result {:?}", result);
                     match req.complete_signal.send(result) {
                         Err(e) => {
@@ -205,9 +203,10 @@ impl<S: Store + Clone> Ingester<S> {
                     let mut lines = Vec::new();
                     for log_line in req.push_request.lines.iter() {
                         lines.push(api::LogLine {
-                            app: req.push_request.app.clone(),
-                            line: log_line.line.clone(),
+                            app: req.push_request.source.clone(),
+                            raw_data: log_line.raw_data.clone(),
                             ts: log_line.ts,
+                            structured: log_line.structured,
                         });
                     }
                     match block_on(async {
@@ -228,7 +227,7 @@ impl<S: Store + Clone> Ingester<S> {
         send_logs(tailers);
 
         // Then send it to the app specific listeners.
-        let tailers = self.tailers.get_mut(&req.push_request.app);
+        let tailers = self.tailers.get_mut(&req.push_request.source);
         send_logs(tailers);
     }
 }

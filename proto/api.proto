@@ -33,9 +33,10 @@
  }
  
  message LogLine {
-     string line = 1;
+     bytes raw_data = 1;
      uint64 ts = 2;
      string app = 3;
+     bool structured = 4;
  }
  
  message PartitionResponse {
