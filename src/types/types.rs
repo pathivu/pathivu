@@ -75,6 +75,10 @@ pub const SEGMENT_PREFIX: &str = "CHOLA_SEGMENT";
 
 pub const SEGEMENT_JSON_KEY_PREFIX: &str = "CHOLA_JSON_KEY";
 
+pub const STRUCTURED_DATA: u8 = 0b0000_0001;
+
+pub const UN_STRUCTURED_DATA: u8 = 0b0000_0000;
+
 // use to get the all the offset of the segment files.
 // IYANAN is one of the thamizha sangam name. which
 // means creator.

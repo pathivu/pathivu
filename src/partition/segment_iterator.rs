@@ -209,7 +209,7 @@ pub fn decode_entry(line_buf: &[u8]) -> Entry {
     let ts = decode_u64(&line_buf[..8]);
     Entry {
         ts: ts,
-        structured: line_buf[9],
+        structured: line_buf[8],
         line: line_buf[9..].to_vec(),
     }
 }

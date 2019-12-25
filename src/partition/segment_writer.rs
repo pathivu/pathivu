@@ -19,7 +19,7 @@ use crate::store::store::Store;
 use crate::types::types;
 use crate::types::types::{
     LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL,
-    SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX,
+    SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX, STRUCTURED_DATA, UN_STRUCTURED_DATA,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
 use failure::{bail, Error};
@@ -171,9 +171,9 @@ impl<S: Store> SegmentWriter<S> {
             buf.push(ts_buf.to_vec());
             // If it is json set the 1 otherwise set 0.
             if log_line.structured {
-                buf.push(vec![1]);
+                buf.push(vec![STRUCTURED_DATA]);
             } else {
-                buf.push(vec![0]);
+                buf.push(vec![UN_STRUCTURED_DATA]);
             }
             // index this line.
             buf.push(line_buf);

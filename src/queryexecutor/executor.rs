@@ -21,7 +21,7 @@ use crate::partition::partition_iterator::PartitionIterator;
 use crate::partition::segment_iterator::Entry;
 use crate::server::server::PartitionHandler;
 use crate::store::store::Store;
-use crate::types::types::{IngesterFlushHintReq, IngesterRequest};
+use crate::types::types::{IngesterFlushHintReq, IngesterRequest, STRUCTURED_DATA};
 use crate::types::types::{QueryRequest, QueryResponse, ResLine};
 use failure::format_err;
 use futures::channel::mpsc::Sender;
@@ -231,9 +231,8 @@ impl<S: Store + Clone> QueryExecutor<S> {
         let key_for_distinct_lookup = &distinct.attr;
         let mut distinct_map: HashMap<String, u64> = HashMap::default();
         self.loop_over_iterator(itr, |entry| {
-            println!("{:?}", entry);
             // Ingore all the unstructred logs.
-            if entry.structured != 1 {
+            if entry.structured != STRUCTURED_DATA {
                 return Ok(());
             }
             // Get the value of the given json key and insert to hashmap to get
@@ -255,7 +254,6 @@ impl<S: Store + Clone> QueryExecutor<S> {
                     if let Some(val) = result {
                         match val {
                             Value::String(key) => {
-                                println!("{:?}", key);
                                 let key = key.into_owned();
                                 count_distinct(key);
                             }
@@ -475,5 +473,12 @@ pub mod tests {
         let distinct_map = executor.handle_distinct(&mut itr, &distinct).unwrap();
 
         assert_eq!(distinct_map.len(), 3);
+
+        assert_eq!(distinct_map.get("Go").is_some(), true);
+        assert_eq!(distinct_map.get("Rust").is_some(), true);
+        assert_eq!(distinct_map.get("Ruby").is_some(), true);
+        assert_eq!(*distinct_map.get("Go").unwrap(), 2);
+        assert_eq!(*distinct_map.get("Rust").unwrap(), 2);
+        assert_eq!(*distinct_map.get("Ruby").unwrap(), 1);
     }
 }
