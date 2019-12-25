@@ -20,7 +20,6 @@ use crate::parser::parser;
 use crate::partition::partition_iterator::PartitionIterator;
 use crate::partition::segment_iterator::Entry;
 use crate::server::server::PartitionHandler;
-use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::{IngesterFlushHintReq, IngesterRequest};
 use crate::types::types::{QueryRequest, QueryResponse, ResLine};
@@ -29,10 +28,19 @@ use futures::channel::mpsc::Sender;
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use futures::sink::SinkExt;
+use simd_json::value::borrowed::Value;
+use simd_json::value::tape::StaticNode;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::rc::Rc;
+
+/// DistinctRes gives the distinct value and count of the distinct value.
+struct DistinctRes {
+    distinct_count: HashMap<String, u64>,
+    show_count: bool,
+}
+
 pub struct QueryExecutor<S: Store + Clone> {
     store: S,
     cfg: Config,
@@ -213,34 +221,82 @@ impl<S: Store + Clone> QueryExecutor<S> {
         Ok(())
     }
 
-    fn handle_distinct(&self, itr: &MergeIteartor<S>, distinct: parser::Distinct) {
-        let distinct_map = HashMap::new();
-        let key_for_distinct_lookup = distinct.attr;
-
-        let cb = |distinct_map: &HashMap<String, u64>| {
-            return |entry: Rc<Entry>| {
-                // Ingore all the unstructred logs.
-                if entry.structured != 1 {
-                    return;
+    fn handle_distinct(
+        &self,
+        itr: &mut MergeIteartor<S>,
+        distinct: &parser::Distinct,
+    ) -> Result<HashMap<String, u64>, failure::Error> {
+        //  let distinct_map = HashMap::new();
+        let key_for_distinct_lookup = &distinct.attr;
+        let mut distinct_map: HashMap<String, u64> = HashMap::default();
+        self.loop_over_iterator(itr, |entry| {
+            // Ingore all the unstructred logs.
+            if entry.structured != 1 {
+                return Ok(());
+            }
+            // Get the value of the given json key and insert to hashmap to get
+            // the distinct value.
+            // TODO: avoid cloning. next should borrow value instead of Rc. But, I'm
+            // keeping this way, to know more how the query layer is going to evolve.
+            // Time being let's make it work. In future, if we end up in more memory
+            // allocation we can optimize here. :)
+            match get_value_from_json(key_for_distinct_lookup.clone(), &mut entry.line.clone()) {
+                Err(e) => return Err(e),
+                Ok(result) => {
+                    let mut count_distinct = |key: String| {
+                        if let Some(val) = distinct_map.get_mut(&key) {
+                            *val = *val + 1;
+                            return;
+                        }
+                        distinct_map.insert(key, 1);
+                    };
+                    if let Some(val) = result {
+                        match val {
+                            Value::String(key) => {
+                                let key = key.into_owned();
+                                count_distinct(key);
+                            }
+                            Value::Static(node) => match node {
+                                StaticNode::I64(num) => {
+                                    count_distinct(format!("{}", num));
+                                }
+                                StaticNode::U64(num) => {
+                                    count_distinct(format!("{}", num));
+                                }
+                                StaticNode::F64(num) => {
+                                    count_distinct(format!("{}", num));
+                                }
+                                StaticNode::Bool(val) => {
+                                    count_distinct(format!("{}", val));
+                                }
+                                StaticNode::Null => {}
+                            },
+                            _ => {
+                                // We don't count
+                            }
+                        }
+                    }
+                    return Ok(());
                 }
-                match get_value_from_json(key_for_distinct_lookup.clone(), &mut entry.line) {
-                    Err(e) => {}
-                }
-            };
-        };
+            }
+        });
+        Ok(distinct_map)
     }
     /// loop over iterator is used to iterate over all the entries of the
     /// given iterator and the each entry is passed to the given callback.
-    fn loop_over_iterator(
+    fn loop_over_iterator<'a, F>(
         &self,
-        itr: &MergeIteartor<S>,
-        cb: Box<dyn Fn(Rc<Entry>)>,
-    ) -> Result<(), failure::Error> {
+        itr: &mut MergeIteartor<S>,
+        mut cb: F,
+    ) -> Result<(), failure::Error>
+    where
+        F: FnMut(Rc<Entry>) -> Result<(), failure::Error>,
+    {
         loop {
             match itr.entry() {
                 None => break,
                 Some(entry) => {
-                    cb(entry);
+                    cb(entry)?;
                     itr.next()?;
                 }
             }

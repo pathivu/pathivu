@@ -42,8 +42,20 @@
      repeated string partitions = 1;
  }
 
- message PartitionRequest {
+ message Empty {
+ }
 
+ message PushLogLine {
+     uint64 ts = 1;
+     repeated string indexes = 2;
+     bool structured = 3;
+     bytes raw_data = 4;
+     repeated string json_keys = 5;
+ }
+
+ message PushRequest {
+     string source = 1;
+     repeated PushLogLine lines = 2;
  }
  // Interface exported by the server.
  service Pathivu {
@@ -52,5 +64,7 @@
     // Query
    rpc Query(QueryRequest) returns (QueryResponse) {}
     // Partitions
-   rpc Partitions(PartitionRequest) returns (PartitionResponse) {}
+   rpc Partitions(Empty) returns (PartitionResponse) {}
+   // Push
+   rpc Push(PushRequest) returns (Empty) {}
  }

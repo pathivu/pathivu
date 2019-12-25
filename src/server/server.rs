@@ -121,7 +121,7 @@ impl api::server::Pathivu for PathivuGrpcServer {
 
     async fn partitions(
         &self,
-        _: Request<api::PartitionRequest>,
+        _: Request<api::Empty>,
     ) -> Result<TonicResponse<api::PartitionResponse>, Status> {
         match get_partitions(&self.partition_path) {
             Ok(partitions) => Ok(TonicResponse::new(api::PartitionResponse {
@@ -130,79 +130,88 @@ impl api::server::Pathivu for PathivuGrpcServer {
             Err(e) => Err(Status::new(Code::Internal, format!("{}", e))),
         }
     }
+
+    async fn push(
+        &self,
+        req: Request<api::PushRequest>,
+    ) -> Result<TonicResponse<api::Empty>, Status> {
+        Ok(TonicResponse::new(api::Empty {}))
+    }
 }
+
+// Depricating rest api.
 // A struct which can store the state which it needs.
-#[derive(Clone)]
-struct PushHandler {
-    sender: Sender<IngesterRequest>,
-    count: Arc<AtomicI32>,
-}
+// #[derive(Clone)]
+// struct PushHandler {
+//     sender: Sender<IngesterRequest>,
+//     count: Arc<AtomicI32>,
+// }
 
-impl PushHandler {
-    fn new(sender: Sender<IngesterRequest>) -> PushHandler {
-        PushHandler {
-            sender: sender,
-            count: Arc::new(AtomicI32::new(0)),
-        }
-    }
-}
+// impl PushHandler {
+//     fn new(sender: Sender<IngesterRequest>) -> PushHandler {
+//         PushHandler {
+//             sender: sender,
+//             count: Arc::new(AtomicI32::new(0)),
+//         }
+//     }
+// }
 
-impl Handler for PushHandler {
-    fn handle(mut self, mut state: State) -> Box<HandlerFuture> {
-        let fut = Body::take_from(&mut state)
-            .concat2()
-            .then(move |body| match body {
-                Ok(body) => {
-                    let result = serde_json::from_slice::<PushRequest>(&body.to_vec());
-                    match result {
-                        Ok(req) => {
-                            block_on(async {
-                                let (complete_sender, complete_receiver) = oneshot::channel();
-                                let ingester_req = IngesterRequest::Push(IngesterPush {
-                                    push_request: req,
-                                    complete_signal: complete_sender,
-                                });
-                                self.sender.send(ingester_req).await;
-                                let res = complete_receiver.await;
-                                info!("completed singnal {:?}", res);
-                                match res {
-                                    Err(e) => {
-                                        info!("yay {:?}", e);
-                                    }
-                                    _ => {
-                                        // Ok is the real value can be error or success,
-                                        // please validate it.
-                                    }
-                                }
-                            });
-                            let res = create_empty_response(&state, StatusCode::OK);
-                            oldfuture::future::ok((state, res))
-                        }
-                        Err(e) => {
-                            let res = create_response(
-                                &state,
-                                StatusCode::NOT_ACCEPTABLE,
-                                mime::TEXT_PLAIN,
-                                format!("{}", e),
-                            );
-                            oldfuture::future::ok((state, res))
-                        }
-                    }
-                }
-                Err(e) => return oldfuture::future::err((state, e.into_handler_error())),
-            });
-        Box::new(fut)
-    }
-}
+// impl Handler for PushHandler {
+//     fn handle(mut self, mut state: State) -> Box<HandlerFuture> {
+//         let fut = Body::take_from(&mut state)
+//             .concat2()
+//             .then(move |body| match body {
+//                 Ok(body) => {
+//                     let result = serde_json::from_slice::<PushRequest>(&body.to_vec());
+//                     match result {
+//                         Ok(req) => {
+//                             block_on(async {
+//                                 let (complete_sender, complete_receiver) = oneshot::channel();
+//                                 let ingester_req = IngesterRequest::Push(IngesterPush {
+//                                     push_request: req,
+//                                     complete_signal: complete_sender,
+//                                 });
+//                                 self.sender.send(ingester_req).await;
+//                                 let res = complete_receiver.await;
+//                                 info!("completed singnal {:?}", res);
+//                                 match res {
+//                                     Err(e) => {
+//                                         info!("yay {:?}", e);
+//                                     }
+//                                     _ => {
+//                                         // Ok is the real value can be error or success,
+//                                         // please validate it.
+//                                     }
+//                                 }
+//                             });
+//                             let res = create_empty_response(&state, StatusCode::OK);
+//                             oldfuture::future::ok((state, res))
+//                         }
+//                         Err(e) => {
+//                             let res = create_response(
+//                                 &state,
+//                                 StatusCode::NOT_ACCEPTABLE,
+//                                 mime::TEXT_PLAIN,
+//                                 format!("{}", e),
+//                             );
+//                             oldfuture::future::ok((state, res))
+//                         }
+//                     }
+//                 }
+//                 Err(e) => return oldfuture::future::err((state, e.into_handler_error())),
+//             });
+//         Box::new(fut)
+//     }
+// }
 
-impl RefUnwindSafe for PushHandler {}
-impl NewHandler for PushHandler {
-    type Instance = Self;
+// impl RefUnwindSafe for PushHandler {}
+// impl NewHandler for PushHandler {
+//     type Instance = Self;
 
-    fn new_handler(&self) -> GothamResult<Self::Instance> {
-        Ok(self.clone())
-    }
-}
+//     fn new_handler(&self) -> GothamResult<Self::Instance> {
+//         Ok(self.clone())
+//     }
+// }
 
 #[derive(Clone)]
 struct HelloHandler {}
@@ -403,7 +412,7 @@ impl Server {
         let addr = "0.0.0.0:5180";
         println!("Listening for requests at http://{}", addr);
         let router = build_simple_router(|route| {
-            route.post("/push").to_new_handler(PushHandler::new(sender));
+            //route.post("/push").to_new_handler(PushHandler::new(sender));
             route.get("/hello").to_new_handler(HelloHandler {});
             route
                 .post("/query")

@@ -126,7 +126,7 @@ pub struct TailerRequest {
 
 #[derive(Debug)]
 pub struct IngesterPush {
-    pub push_request: PushRequest,
+    pub push_request: api::PushRequest,
     pub complete_signal: Sender<Result<(), Error>>,
 }
 

@@ -28,7 +28,9 @@ use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tonic::Status;
-
+pub mod api {
+    tonic::include_proto!("api"); // The string specified here must match the proto package name
+}
 pub struct Ingester<S: Store> {
     receiver: Receiver<IngesterRequest>,
     id: u8,
@@ -65,7 +67,7 @@ impl<S: Store + Clone> Ingester<S> {
                     self.handle_tailers(&req);
 
                     // now persist in the segment writer.
-                    let result = self.push(&req.push_request.app, req.push_request.lines);
+                    let result = self.push(req);
                     info!(" result {:?}", result);
                     match req.complete_signal.send(result) {
                         Err(e) => {
@@ -115,31 +117,31 @@ impl<S: Store + Clone> Ingester<S> {
         Ok(())
     }
 
-    fn push(&mut self, partition: &String, lines: Vec<LogLine>) -> Result<(), failure::Error> {
-        if lines.len() == 0 {
+    fn push(&mut self, req: api::PushRequest) -> Result<(), failure::Error> {
+        if req.lines.len() == 0 {
             return Ok(());
         }
         debug!(
             "ingesting partition {}, with {} lines",
-            partition,
-            lines.len()
+            req.source,
+            req.lines.len()
         );
         let ref mut segment_writer: SegmentWriter<S>;
-        if let Some(writer) = self.segment_writers.get_mut(partition) {
+        if let Some(writer) = self.segment_writers.get_mut(&req.source) {
             segment_writer = writer;
             info!("writer is thre");
         } else {
             info!("writer not there");
-            let writer = self.create_segment_writer(&partition.clone(), lines[0].ts)?;
+            let writer = self.create_segment_writer(&req.source, req.lines[0].ts)?;
             info!("inserting yo");
-            self.segment_writers.insert(partition.clone(), writer);
-            segment_writer = self.segment_writers.get_mut(partition).unwrap();
+            self.segment_writers.insert(req.source.clone(), writer);
+            segment_writer = self.segment_writers.get_mut(&req.source).unwrap();
         }
-        segment_writer.push(lines)?;
+        segment_writer.push(req.lines)?;
         if self.cfg.max_segment_size <= segment_writer.size()
         //|| self.cfg.max_index_size <= segment_writer.index_size()
         {
-            let segment_writer = self.segment_writers.remove(partition).unwrap();
+            let segment_writer = self.segment_writers.remove(&req.source).unwrap();
             segment_writer.close()?;
         }
         info!("segment writers {:}", &self.segment_writers.len());
