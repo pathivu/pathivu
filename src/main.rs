@@ -15,6 +15,7 @@
  */
 #![feature(or_patterns)]
 #![feature(async_closure)]
+#![feature(type_ascription)]
 mod config;
 mod ingester;
 mod iterator;

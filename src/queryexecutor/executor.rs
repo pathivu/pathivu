@@ -28,6 +28,7 @@ use futures::channel::mpsc::Sender;
 use futures::channel::oneshot;
 use futures::executor::block_on;
 use futures::sink::SinkExt;
+use serde_json::json;
 use simd_json::value::borrowed::Value;
 use simd_json::value::tape::StaticNode;
 use std::borrow::Cow;
@@ -149,7 +150,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
         start_ts: u64,
         end_ts: u64,
         forward: bool,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<String, failure::Error> {
         let query = parser::parse(query)?;
         let mut itrs = Vec::new();
         let mut partitions = query.soruces;
@@ -191,7 +192,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
                 partition,
                 start_ts,
                 end_ts,
-                None,
+                query.selection.clone(),
                 self.store.clone(),
                 self.cfg.clone(),
                 !forward,
@@ -217,8 +218,44 @@ impl<S: Store + Clone> QueryExecutor<S> {
 
         if let Some(distinct) = query.distinct {
             // Find the distinct values for the given attribute.
+            let distinct_map = self.handle_distinct(&mut itr, &distinct)?;
+
+            // Build json objects.
+            let mut objects = Vec::new();
+            if distinct.count {
+                for (key, val) in distinct_map {
+                    let obj = json!({ format!("{}", key): val }).to_string();
+                    objects.push(obj);
+                }
+            } else {
+                for (key, _) in distinct_map {
+                    objects.push(format!("\"{}\"", key));
+                }
+            }
+
+            // Build the output json.
+            let out = self.build_json(objects);
+            return Ok(out);
         }
-        Ok(())
+        // TODO: should return json
+        Ok(String::default())
+    }
+
+    /// build json is used to build output json from the given vector of jsons.
+    fn build_json(&self, mut objects: Vec<String>) -> String {
+        let mut out = String::from(
+            r#"{
+            "data":[
+        "#,
+        );
+        for i in 0..objects.len() {
+            out.push_str(&mut objects[i]);
+            if i < objects.len() - 1 {
+                out.push_str(&mut r#","#);
+            }
+        }
+        out.push_str(&mut r#"] }"#);
+        out
     }
 
     /// handle distinct gives the distinct count of the given log lines based on the query attr.

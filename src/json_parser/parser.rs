@@ -70,6 +70,12 @@ pub mod tests {
             }
         }"#
         .to_vec();
+        // 0 Level nesting.
+        let val = get_value_from_json("name".to_string(), &mut json).unwrap();
+        assert_eq!(
+            Value::String(std::borrow::Cow::Borrowed("Licenser")),
+            val.unwrap()
+        );
         // 1 level nesting.
         let val = get_value_from_json("skills.language".to_string(), &mut json).unwrap();
         assert_eq!(

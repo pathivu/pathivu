@@ -20,4 +20,6 @@
 
 protoc --go_out=plugins=grpc:. api.proto
 
-mv api.pb.go ../katchi/api
+cp api.pb.go ../katchi/api
+cp api.pb.go ../misc/api
+rm api.pb.go
