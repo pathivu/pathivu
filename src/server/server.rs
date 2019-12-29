@@ -17,7 +17,6 @@ use crate::config::config::Config;
 use crate::ingester::ingester::Ingester;
 use crate::queryexecutor::executor::QueryExecutor;
 use crate::replayer::replayer::Replayer;
-use crate::store::batch::Batch;
 use crate::store::rocks_store;
 use crate::store::store::Store;
 use crate::types::types::*;
@@ -32,7 +31,6 @@ use futures::sink::SinkExt;
 use gotham;
 use gotham::error::Result as GothamResult;
 use gotham::handler::{Handler, HandlerFuture, IntoHandlerError, IntoResponse, NewHandler};
-use gotham::helpers::http::response::create_empty_response;
 use gotham::helpers::http::response::create_response;
 use gotham::router::builder::*;
 use gotham::router::Router;
@@ -70,18 +68,20 @@ impl api::server::Pathivu for PathivuGrpcServer {
         &self,
         req: Request<api::QueryRequest>,
     ) -> Result<TonicResponse<Self::TailStream>, Status> {
-        let (mut tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(100);
         let req = req.into_inner();
         let tailer_req = TailerRequest {
             partitions: req.partitions,
             sender: tx,
         };
         let mut ingester_transport = self.ingester_transport.clone();
-        block_on(async {
+        if let Err(e) = block_on(async {
             ingester_transport
                 .send(IngesterRequest::RegisterTailer(tailer_req))
                 .await
-        });
+        }) {
+            return Err(Status::new(Code::Internal, format!("{}", e)));
+        }
         Ok(TonicResponse::new(rx))
     }
 
@@ -105,15 +105,16 @@ impl api::server::Pathivu for PathivuGrpcServer {
         match res {
             Ok(mut query_res) => {
                 // convert query response into grpc response.
-                let mut lines = Vec::new();
-                for line in query_res.lines.drain(..) {
-                    lines.push(api::LogLine {
-                        line: line.line,
-                        ts: line.ts,
-                        app: line.app,
-                    });
-                }
-                Ok(TonicResponse::new(api::QueryResponse { lines: lines }))
+                // let mut lines = Vec::new();
+                // for line in query_res.lines.drain(..) {
+                //     lines.push(api::LogLine {
+                //         line: line.line,
+                //         ts: line.ts,
+                //         app: line.app,
+                //     });
+                // }
+                // JSON needs to be changed here
+                Ok(TonicResponse::new(api::QueryResponse::default()))
             }
             Err(err_msg) => Err(Status::new(Code::Internal, err_msg)),
         }
@@ -121,7 +122,7 @@ impl api::server::Pathivu for PathivuGrpcServer {
 
     async fn partitions(
         &self,
-        _: Request<api::PartitionRequest>,
+        _: Request<api::Empty>,
     ) -> Result<TonicResponse<api::PartitionResponse>, Status> {
         match get_partitions(&self.partition_path) {
             Ok(partitions) => Ok(TonicResponse::new(api::PartitionResponse {
@@ -130,77 +131,30 @@ impl api::server::Pathivu for PathivuGrpcServer {
             Err(e) => Err(Status::new(Code::Internal, format!("{}", e))),
         }
     }
-}
-// A struct which can store the state which it needs.
-#[derive(Clone)]
-struct PushHandler {
-    sender: Sender<IngesterRequest>,
-    count: Arc<AtomicI32>,
-}
 
-impl PushHandler {
-    fn new(sender: Sender<IngesterRequest>) -> PushHandler {
-        PushHandler {
-            sender: sender,
-            count: Arc::new(AtomicI32::new(0)),
-        }
-    }
-}
-
-impl Handler for PushHandler {
-    fn handle(mut self, mut state: State) -> Box<HandlerFuture> {
-        let fut = Body::take_from(&mut state)
-            .concat2()
-            .then(move |body| match body {
-                Ok(body) => {
-                    let result = serde_json::from_slice::<PushRequest>(&body.to_vec());
-                    match result {
-                        Ok(req) => {
-                            block_on(async {
-                                let (complete_sender, complete_receiver) = oneshot::channel();
-                                let ingester_req = IngesterRequest::Push(IngesterPush {
-                                    push_request: req,
-                                    complete_signal: complete_sender,
-                                });
-                                self.sender.send(ingester_req).await;
-                                let res = complete_receiver.await;
-                                info!("completed singnal {:?}", res);
-                                match res {
-                                    Err(e) => {
-                                        info!("yay {:?}", e);
-                                    }
-                                    _ => {
-                                        // Ok is the real value can be error or success,
-                                        // please validate it.
-                                    }
-                                }
-                            });
-                            let res = create_empty_response(&state, StatusCode::OK);
-                            oldfuture::future::ok((state, res))
-                        }
-                        Err(e) => {
-                            let res = create_response(
-                                &state,
-                                StatusCode::NOT_ACCEPTABLE,
-                                mime::TEXT_PLAIN,
-                                format!("{}", e),
-                            );
-                            oldfuture::future::ok((state, res))
-                        }
-                    }
-                }
-                Err(e) => return oldfuture::future::err((state, e.into_handler_error())),
+    /// push will ingest log line.
+    async fn push(
+        &self,
+        req: Request<api::PushRequest>,
+    ) -> Result<TonicResponse<api::Empty>, Status> {
+        let mut sender = self.ingester_transport.clone();
+        if let Err(e) = block_on(async {
+            let (complete_sender, complete_receiver) = oneshot::channel();
+            let ingester_req = IngesterRequest::Push(IngesterPush {
+                push_request: req.into_inner(),
+                complete_signal: complete_sender,
             });
-        Box::new(fut)
-    }
-}
-
-impl RefUnwindSafe for PushHandler {}
-impl NewHandler for PushHandler {
-    type Instance = Self;
-
-    fn new_handler(&self) -> GothamResult<Self::Instance> {
-        Ok(self.clone())
+            if let Err(e) = sender.send(ingester_req).await {
+                return Err(format!("{}", e));
+            }
+            if let Err(e) = complete_receiver.await {
+                return Err(format!("{}", e));
+            }
+            return Ok(());
+        }) {
+            return Err(Status::new(Code::Internal, e));
+        }
+        Ok(TonicResponse::new(api::Empty {}))
     }
 }
 
@@ -225,8 +179,9 @@ struct QueryHandler {
     executor: QueryExecutor<rocks_store::RocksStore>,
 }
 impl QueryHandler {
-    fn execute(&mut self, req: QueryRequest) -> Result<QueryResponse, String> {
-        self.executor.execute(req)
+    fn execute(&mut self, req: QueryRequest) -> Result<String, failure::Error> {
+        self.executor
+            .execute_sql_query(req.query, req.start_ts, req.end_ts, req.forward)
     }
 }
 
@@ -241,13 +196,11 @@ impl Handler for QueryHandler {
                     match result {
                         Ok(req) => match executor.execute(req) {
                             Ok(res) => {
-                                let body = serde_json::to_string(&res)
-                                    .expect("Failed to serialise to json");
                                 let res = create_response(
                                     &state,
                                     StatusCode::CREATED,
                                     mime::APPLICATION_JSON,
-                                    body,
+                                    res,
                                 );
 
                                 return oldfuture::future::ok((state, res));
@@ -383,7 +336,7 @@ impl Server {
         let executor = QueryExecutor::new(cfg.clone(), sender.clone(), store);
         let addr = "0.0.0.0:6180".parse().unwrap();
         let pathivu_grpc = PathivuGrpcServer {
-            ingester_transport: sender.clone(),
+            ingester_transport: sender,
             query_executor: executor.clone(),
             partition_path: cfg.dir.clone(),
         };
@@ -403,7 +356,7 @@ impl Server {
         let addr = "0.0.0.0:5180";
         println!("Listening for requests at http://{}", addr);
         let router = build_simple_router(|route| {
-            route.post("/push").to_new_handler(PushHandler::new(sender));
+            //route.post("/push").to_new_handler(PushHandler::new(sender));
             route.get("/hello").to_new_handler(HelloHandler {});
             route
                 .post("/query")

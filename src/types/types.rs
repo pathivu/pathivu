@@ -29,6 +29,9 @@ pub struct LogLine {
     pub line: String,
     pub ts: u64,
     pub indexes: Vec<String>,
+    pub json: bool,
+    // always push flattened json keys.
+    pub json_keys: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -69,6 +72,12 @@ pub struct PushRequest {
 pub const PARTITION_PREFIX: &str = "CHOLA_PARTITION_SHIYALI";
 
 pub const SEGMENT_PREFIX: &str = "CHOLA_SEGMENT";
+
+pub const SEGEMENT_JSON_KEY_PREFIX: &str = "CHOLA_JSON_KEY";
+
+pub const STRUCTURED_DATA: u8 = 0b0000_0001;
+
+pub const UN_STRUCTURED_DATA: u8 = 0b0000_0000;
 
 // use to get the all the offset of the segment files.
 // IYANAN is one of the thamizha sangam name. which
@@ -121,7 +130,7 @@ pub struct TailerRequest {
 
 #[derive(Debug)]
 pub struct IngesterPush {
-    pub push_request: PushRequest,
+    pub push_request: api::PushRequest,
     pub complete_signal: Sender<Result<(), Error>>,
 }
 

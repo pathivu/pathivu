@@ -26,7 +26,6 @@ binary-heap-plus = "0.2.0"
 fst-levenshtein = "0.2"
 rand = "0.7"
 tempfile = "3"
-nom = "5.0.1"
 rust-stemmers = "1.2.0"
 stopwords = "0.1.0"
 bytes = "0.4"
@@ -34,8 +33,13 @@ tonic = "0.1.0-alpha.6"
 prost = "0.5.0"
 tokio = "=0.2.0-alpha.6"
 retain_mut = "0.1.0"
+array_tool = "1.0.3"
 # Required for wellknown types
 prost-types = "0.5"
+pest = "2.0"
+pest_derive = "2.0"
+simd-json = "0.2.2"
+
 [dependencies.rocksdb]
 git = "https://github.com/pingcap/rust-rocksdb.git"
 

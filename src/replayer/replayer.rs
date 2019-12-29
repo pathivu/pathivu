@@ -284,6 +284,7 @@ pub mod tests {
     use crate::partition::segment_iterator::SegmentIterator;
     use crate::partition::segment_writer::tests::{get_test_cfg, get_test_store};
     use crate::partition::segment_writer::SegmentWriter;
+    use crate::types::types::api::PushLogLine;
     use crate::types::types::LogLine;
     use std::fs::OpenOptions;
     #[test]
@@ -302,8 +303,8 @@ pub mod tests {
         )
         .unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: String::from("liala transfered money to raja"),
+        lines.push(PushLogLine {
+            raw_data: String::from("liala transfered money to raja").into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -311,9 +312,11 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
+            structured: false,
+            json_keys: Vec::default(),
         });
-        lines.push(LogLine {
-            line: String::from("roja transfered money to navin"),
+        lines.push(PushLogLine {
+            raw_data: String::from("roja transfered money to navin").into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -321,6 +324,8 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
+            structured: false,
+            json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();
         segment_writer.flush().unwrap();
@@ -337,7 +342,7 @@ pub mod tests {
             1,
             partition_path.clone().join("tmppartition"),
             store.clone(),
-            String::from(""),
+            None,
             String::from("tmppartition"),
             1,
             5,
@@ -363,8 +368,8 @@ pub mod tests {
         )
         .unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: String::from("liala transfered money to raja"),
+        lines.push(PushLogLine {
+            raw_data: String::from("liala transfered money to raja").into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -372,9 +377,11 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
+            structured: false,
+            json_keys: Vec::default(),
         });
-        lines.push(LogLine {
-            line: String::from("roja transfered money to navin"),
+        lines.push(PushLogLine {
+            raw_data: String::from("roja transfered money to navin").into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -382,6 +389,8 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
+            structured: false,
+            json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();
         segment_writer.flush().unwrap();
@@ -412,7 +421,7 @@ pub mod tests {
             1,
             partition_path,
             store.clone(),
-            String::from(""),
+            None,
             String::from("tmppartition"),
             1,
             5,

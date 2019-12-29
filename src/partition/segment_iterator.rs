@@ -13,28 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::config::config::Config;
+use crate::parser::parser::Selection;
 use crate::partition::iterator::Iterator;
 use crate::partition::posting_list;
-use crate::store::batch::Batch;
 use crate::store::store::Store;
-use crate::types::types::{POSTING_LIST_ALL, SEGMENT_PREFIX};
+use crate::types::types::{POSTING_LIST_ALL, SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX};
 use crate::util::decode_u64;
+use array_tool::vec::Intersect;
 use failure;
-use failure::bail;
-use fst::{IntoStreamer, Set, Streamer};
+use fst::{IntoStreamer, Set};
 use fst_levenshtein::Levenshtein;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
-use std::marker::PhantomData;
 use std::path;
 use std::rc::Rc;
-use std::time::Duration;
 #[derive(Debug)]
 pub struct Entry {
     pub line: Vec<u8>,
     pub ts: u64,
+    pub structured: u8,
 }
 
 // SegmentIterator is used to iterate over segment files.
@@ -52,7 +50,7 @@ impl<S: Store> SegmentIterator<S> {
         id: u64,
         partition_path: path::PathBuf,
         store: S,
-        query: String,
+        selection: Option<Selection>,
         partition: String,
         start_ts: u64,
         end_ts: u64,
@@ -61,22 +59,68 @@ impl<S: Store> SegmentIterator<S> {
         // let collect all the posting list for the given indices.
         let mut entry_indices = Vec::new();
 
-        // query fst if there is any query string.
-        if query != "" {
-            // open index file.
-            // no clue why it is unsafe by default.
-            // TODO: investigate why it is unsafe and handle it properly.
-            let index_set = unsafe {
-                Set::from_path(partition_path.join(format!("segment_index_{}.fst", id)))
-            }?;
+        match selection {
+            Some(selection) => {
+                let mut key_indices = Vec::new();
+                if selection.structured {
+                    // get the key indices first for the segment posting list.
+                    let list = store.get(
+                        format!(
+                            "{}_{}_{}_{}",
+                            SEGEMENT_JSON_KEY_PREFIX,
+                            partition,
+                            id,
+                            &selection.attr.unwrap()
+                        )
+                        .as_bytes(),
+                    )?;
+                    match list {
+                        Some(list) => {
+                            // Decode the posting list for the given key.
+                            key_indices = posting_list::decode_posting_list(&list)?;
+                        }
+                        None => {
+                            // During intersection you'll get nothing so chill.
+                        }
+                    }
+                }
+                // open index file.
+                // no clue why it is unsafe by default.
+                // TODO: investigate why it is unsafe and handle it properly.
+                let index_set = unsafe {
+                    Set::from_path(partition_path.join(format!("segment_index_{}.fst", id)))
+                }?;
+                // TODO: doing fuzzy query now. But in future, it should be configurable.
+                // TODO: don't do value indices search on structured query with zero key indices.
+                let fuzzy_query = Levenshtein::new(&selection.value, 2)?;
+                let indices_stream = index_set.search(fuzzy_query).into_stream().into_strs()?;
+                // get all the posting list for the given indices.
+                let mut value_indices = Vec::new();
+                for index in indices_stream {
+                    // TODO: Don't use get here. Change this to prefix iterator. based on the key do the
+                    // decoding stuff.
+                    let index_key = format!("{}_{}_{}_{}", SEGMENT_PREFIX, partition, id, &index);
+                    let list = store.get(index_key.as_bytes())?;
+                    // skip if there is no value. Ideally we should thrown an error. Because index is
+                    // missing
+                    if list.is_none() {
+                        panic!("posting list not found for the index  key {}", index_key);
+                    }
+                    let mut list = posting_list::decode_posting_list(&list.unwrap())?;
+                    value_indices.append(&mut list);
+                }
 
-            let fuzzy_query = Levenshtein::new(&query, 2)?;
-            let indices_stream = index_set.search(fuzzy_query).into_stream().into_strs()?;
-            // get all the posting list for the given indices.
-            for index in indices_stream {
-                // TODO: Don't use get here. Change this to prefix iterator. based on the key do the
-                // decoding stuff.
-                let index_key = format!("{}_{}_{}_{}", SEGMENT_PREFIX, partition, id, &index);
+                if selection.structured {
+                    entry_indices = key_indices.intersect(value_indices);
+                } else {
+                    entry_indices = value_indices;
+                }
+            }
+            None => {
+                let index_key = format!(
+                    "{}_{}_{}_{}",
+                    SEGMENT_PREFIX, partition, id, POSTING_LIST_ALL
+                );
                 let list = store.get(index_key.as_bytes())?;
                 // skip if there is no value. Ideally we should thrown an error. Because index is
                 // missing
@@ -86,20 +130,9 @@ impl<S: Store> SegmentIterator<S> {
                 let mut list = posting_list::decode_posting_list(&list.unwrap())?;
                 entry_indices.append(&mut list);
             }
-        } else {
-            let index_key = format!(
-                "{}_{}_{}_{}",
-                SEGMENT_PREFIX, partition, id, POSTING_LIST_ALL
-            );
-            let list = store.get(index_key.as_bytes())?;
-            // skip if there is no value. Ideally we should thrown an error. Because index is
-            // missing
-            if list.is_none() {
-                panic!("posting list not found for the index  key {}", index_key);
-            }
-            let mut list = posting_list::decode_posting_list(&list.unwrap())?;
-            entry_indices.append(&mut list);
         }
+
+        // query fst if there is any query string.
         // now sort all the indices. because there may be duplication and ordering.
         // But the indices in the posting list are in sorted order. Here we can make one
         // more micro optimization if there is only one set no need to sort.
@@ -176,6 +209,7 @@ pub fn decode_entry(line_buf: &[u8]) -> Entry {
     let ts = decode_u64(&line_buf[..8]);
     Entry {
         ts: ts,
-        line: line_buf[8..].to_vec(),
+        structured: line_buf[8],
+        line: line_buf[9..].to_vec(),
     }
 }

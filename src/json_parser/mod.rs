@@ -13,14 +13,5 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-pub mod decode;
-pub mod util;
-use byteorder::LittleEndian;
-use byteorder::ReadBytesExt;
-use std::io::Cursor;
-/// decode_u64 is used to decode the buf.
-pub fn decode_u64(buf: &[u8]) -> u64 {
-    let mut reader = Cursor::new(buf);
-    // let it panic, If any invalid data.
-    reader.read_u64::<LittleEndian>().unwrap()
-}
+
+pub mod parser;

@@ -16,8 +16,10 @@
 use crate::config::config::Config;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
+use crate::types::types;
 use crate::types::types::{
-    LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL, SEGMENT_PREFIX,
+    LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL,
+    SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX, STRUCTURED_DATA, UN_STRUCTURED_DATA,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
 use failure::{bail, Error};
@@ -46,14 +48,15 @@ pub struct SegmentWriter<S> {
     pub partition: String,
     config: Config,
     segment_file: File,
-    batch: Vec<LogLine>,
+    batch: Vec<types::api::PushLogLine>,
     file_offset: u64,
     store: S,
     id: u64,
     start_ts: u64,
     end_ts: u64,
     batch_count: usize,
-    posting_list: HashMap<String, Vec<u8>>,
+    index_posting_list: HashMap<String, Vec<u8>>,
+    json_key_posting_list: HashMap<String, Vec<u8>>,
     index_size: usize,
     entry_offsets: Vec<u8>,
     flushed_offset: u64,
@@ -94,7 +97,8 @@ impl<S: Store> SegmentWriter<S> {
             start_ts: start_ts,
             end_ts: start_ts,
             batch_count: 0,
-            posting_list: HashMap::default(),
+            index_posting_list: HashMap::default(),
+            json_key_posting_list: HashMap::default(),
             index_size: 0,
             entry_offsets: Vec::new(),
             flushed_offset: file_index,
@@ -104,7 +108,7 @@ impl<S: Store> SegmentWriter<S> {
     /// push pushes logline and terms of the logline. terms are used to index the line's file
     /// offset. push will essentially batch all the line. Once the batch size reached, it'll
     /// flush the line to the file.
-    pub fn push(&mut self, mut lines: Vec<LogLine>) -> Result<(), Error> {
+    pub fn push(&mut self, mut lines: Vec<types::api::PushLogLine>) -> Result<(), Error> {
         // encoding line length.
         let drain = lines.drain(0..lines.len());
         for line in drain {
@@ -129,7 +133,7 @@ impl<S: Store> SegmentWriter<S> {
                 .as_mut()
                 .write_u64::<LittleEndian>(self.file_offset);
             // Encode log line.
-            let line_buf = log_line.line.into_bytes();
+            let line_buf = log_line.raw_data;
             // Encode time stamp.
             let mut ts_buf = [0u8; mem::size_of::<u64>()];
             ts_buf.as_mut().write_u64::<LittleEndian>(log_line.ts);
@@ -139,13 +143,25 @@ impl<S: Store> SegmentWriter<S> {
             self.entry_offsets.extend(line_offset.to_vec());
             for term in indexes {
                 self.index_size = self.index_size + term.len();
-                if let Some(posting_list) = self.posting_list.get_mut(&term) {
+                if let Some(posting_list) = self.index_posting_list.get_mut(&term) {
                     posting_list.extend(line_offset.to_vec().iter());
                 } else {
-                    self.posting_list.insert(term.clone(), line_offset.to_vec());
+                    self.index_posting_list
+                        .insert(term.clone(), line_offset.to_vec());
                 }
             }
-            let entry_length = (line_buf.len() + ts_buf.len()) as u64;
+
+            // Populate posting list of json keys as well.
+            let json_keys = log_line.json_keys.drain(0..log_line.json_keys.len());
+            for key in json_keys {
+                if let Some(posting_list) = self.json_key_posting_list.get_mut(&key) {
+                    posting_list.extend(line_offset.to_vec().iter());
+                } else {
+                    self.json_key_posting_list.insert(key, line_offset.to_vec());
+                }
+            }
+            // TS LENGTH + STRUCTURED KEY + LINE LENGTH.
+            let entry_length = (line_buf.len() + ts_buf.len() + 1) as u64;
             // advance the file offset.
             self.file_offset = self.file_offset + entry_length + 8;
             // encode entry length.
@@ -153,6 +169,12 @@ impl<S: Store> SegmentWriter<S> {
             len_buf.as_mut().write_u64::<LittleEndian>(entry_length);
             buf.push(len_buf.to_vec());
             buf.push(ts_buf.to_vec());
+            // If it is json set the 1 otherwise set 0.
+            if log_line.structured {
+                buf.push(vec![STRUCTURED_DATA]);
+            } else {
+                buf.push(vec![UN_STRUCTURED_DATA]);
+            }
             // index this line.
             buf.push(line_buf);
             // advance line ts.
@@ -223,7 +245,7 @@ impl<S: Store> SegmentWriter<S> {
         // insert posting list.
         let mut indices = Vec::new();
         let mut wb = Batch::new();
-        let posting_list = self.posting_list.drain();
+        let posting_list = self.index_posting_list.drain();
         for (index, list) in posting_list {
             wb.set(
                 format!(
@@ -235,6 +257,19 @@ impl<S: Store> SegmentWriter<S> {
             )
             .unwrap();
             indices.push(index);
+        }
+        // Insert json key posting list.
+        let posting_list = self.json_key_posting_list.drain();
+        for (key, list) in posting_list {
+            wb.set(
+                format!(
+                    "{}_{}_{}_{}",
+                    SEGEMENT_JSON_KEY_PREFIX, self.partition, self.id, &key
+                )
+                .into_bytes(),
+                list,
+            )
+            .unwrap();
         }
         wb.set(
             format!(
@@ -292,9 +327,11 @@ impl<S: Store> SegmentWriter<S> {
 pub mod tests {
     use super::*;
     use crate::config::config::Config;
+    use crate::parser::parser::Selection;
     use crate::partition::iterator::Iterator;
     use crate::partition::segment_iterator::SegmentIterator;
     use crate::store::rocks_store::RocksStore;
+    use crate::types::types::api::PushLogLine;
     use crate::types::types::LogLine;
     use std::path::Path;
     use tempfile;
@@ -323,8 +360,8 @@ pub mod tests {
         )
         .unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: String::from("liala transfered money to raja"),
+        lines.push(PushLogLine {
+            raw_data: String::from("liala transfered money to raja").into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -332,9 +369,11 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: 2,
+            structured: false,
+            json_keys: Vec::new(),
         });
-        lines.push(LogLine {
-            line: String::from("roja transfered money to navin"),
+        lines.push(PushLogLine {
+            raw_data: String::from("roja transfered money to navin").into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -342,6 +381,8 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: 4,
+            structured: false,
+            json_keys: Vec::new(),
         });
         segment_writer.push(lines);
         // check the end ts.
@@ -349,14 +390,14 @@ pub mod tests {
         // check all the entry offset.
         assert_eq!(segment_writer.entry_offsets.len(), 16);
         // check posint list length.
-        assert_eq!(segment_writer.posting_list.len(), 6);
+        assert_eq!(segment_writer.index_posting_list.len(), 6);
         segment_writer.close().unwrap();
         let partition_path = Path::new(&cfg.dir).join("partition").join("tmppartition");
         let mut iterator = SegmentIterator::new(
             1,
             partition_path.clone(),
             store.clone(),
-            String::from(""),
+            None,
             String::from("tmppartition"),
             1,
             5,
@@ -377,7 +418,11 @@ pub mod tests {
             1,
             partition_path,
             store,
-            String::from("navi"),
+            Some(Selection {
+                value: String::from("navi"),
+                attr: None,
+                structured: false,
+            }),
             String::from("tmppartition"),
             1,
             5,

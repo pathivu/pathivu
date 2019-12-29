@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 use crate::config::config::Config;
+use crate::parser::parser::Selection;
 use crate::partition::iterator::Iterator;
 use crate::partition::segment_iterator::Entry;
 use crate::partition::segment_iterator::SegmentIterator;
@@ -36,7 +37,7 @@ pub struct PartitionIterator<S> {
     current_iterator: Option<SegmentIterator<S>>,
     cfg: Config,
     partition: String,
-    query: String,
+    selection: Option<Selection>,
     start_ts: u64,
     end_ts: u64,
     backward: bool,
@@ -48,7 +49,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         partition: String,
         start_ts: u64,
         end_ts: u64,
-        query: String,
+        selection: Option<Selection>,
         store: S,
         cfg: Config,
         backward: bool,
@@ -79,6 +80,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         }
 
         let mut current_iterator = None;
+        // TODO: we should return None if there is no segment files.
         if filtered_segments.len() > 0 {
             let segment_file = filtered_segments.get(0).unwrap();
             let partition_path = Path::new(&cfg.dir).join("partition").join(&partition);
@@ -86,7 +88,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 segment_file.id,
                 partition_path,
                 store.clone(),
-                query.clone(),
+                selection.clone(),
                 partition.clone(),
                 start_ts,
                 end_ts,
@@ -101,7 +103,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             cfg: cfg,
             current_iterator: current_iterator,
             partition: partition,
-            query: query,
+            selection: selection,
             start_ts: start_ts,
             end_ts: end_ts,
             backward: backward,
@@ -148,7 +150,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             segment_file.id,
             partition_path,
             self.store.clone(),
-            self.query.clone(),
+            self.selection.clone(),
             self.partition.clone(),
             self.start_ts,
             self.end_ts,
@@ -175,6 +177,7 @@ pub mod tests {
     use crate::partition::segment_writer::SegmentWriter;
     use crate::store::rocks_store::RocksStore;
     use crate::store::store::Store;
+    use crate::types::types::api::PushLogLine;
     use crate::types::types::{LogLine, PartitionRegistry, PARTITION_PREFIX};
     pub fn create_segment(
         id: u64,
@@ -185,8 +188,8 @@ pub mod tests {
     ) {
         let mut segment_writer = SegmentWriter::new(cfg, partition, id, store, start_ts).unwrap();
         let mut lines = Vec::new();
-        lines.push(LogLine {
-            line: format!("liala transfered {} money to raja", start_ts + 100),
+        lines.push(PushLogLine {
+            raw_data: format!("liala transfered {} money to raja", start_ts + 100).into_bytes(),
             indexes: vec![
                 "liala".to_string(),
                 "transfered".to_string(),
@@ -194,9 +197,11 @@ pub mod tests {
                 "raja".to_string(),
             ],
             ts: start_ts,
+            structured: false,
+            json_keys: Vec::default(),
         });
-        lines.push(LogLine {
-            line: format!("liala transfered {} money to raja", start_ts + 300),
+        lines.push(PushLogLine {
+            raw_data: format!("liala transfered {} money to raja", start_ts + 300).into_bytes(),
             indexes: vec![
                 "roja".to_string(),
                 "transfered".to_string(),
@@ -204,6 +209,8 @@ pub mod tests {
                 "navin".to_string(),
             ],
             ts: start_ts + 2,
+            structured: false,
+            json_keys: Vec::default(),
         });
         segment_writer.push(lines).unwrap();
         segment_writer.close().unwrap();
@@ -218,7 +225,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, false)
+            PartitionIterator::new(partition_name, 1, 9, None, store, cfg, false)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);
@@ -246,7 +253,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, String::from(""), store, cfg, true)
+            PartitionIterator::new(partition_name, 1, 9, None, store, cfg, true)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 9);
