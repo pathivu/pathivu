@@ -204,7 +204,7 @@ impl<S: Store + Clone> Ingester<S> {
                     for log_line in req.push_request.lines.iter() {
                         lines.push(api::LogLine {
                             app: req.push_request.source.clone(),
-                            raw_data: log_line.raw_data.clone(),
+                            inner: String::from_utf8(log_line.raw_data.clone()).unwrap(),
                             ts: log_line.ts,
                             structured: log_line.structured,
                         });
