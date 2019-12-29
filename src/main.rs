@@ -16,6 +16,7 @@
 #![feature(or_patterns)]
 #![feature(async_closure)]
 #![feature(type_ascription)]
+#![feature(result_map_or_else)]
 mod config;
 mod ingester;
 mod iterator;

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 pub mod decode;
+pub mod util;
 use byteorder::LittleEndian;
 use byteorder::ReadBytesExt;
 use std::io::Cursor;

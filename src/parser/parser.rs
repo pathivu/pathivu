@@ -83,11 +83,15 @@ impl Query {
 /// parse will parse the given query string into internal
 /// Pathivu query structure.
 pub fn parse(query: String) -> Result<Query, Error> {
+    let mut query_innner = Query::default();
+    // Don't parse empty string
+    if query == "" {
+        return Ok(query_innner);
+    }
     let mut result = QueryParser::parse(Rule::query, &query)?;
-    let mut query = Query::default();
     let tokens = result.next().unwrap();
-    parse_query(tokens, &mut query)?;
-    Ok(query)
+    parse_query(tokens, &mut query_innner)?;
+    Ok(query_innner)
 }
 
 /// parse_average will parse average group by.
@@ -161,6 +165,12 @@ pub fn parse_query(pair: Pair<'_, Rule>, mut query: &mut Query) -> Result<(), Er
                     return Err(format_err!("You can only use one limit operator"));
                 }
                 parse_limit(inner, &mut query);
+            }
+            Rule::source => {
+                if query.soruces.len() != 0 {
+                    return Err(format_err!("You can mention source only once"));
+                }
+                parse_source(inner, &mut query);
             }
             _ => {}
         }

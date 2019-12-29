@@ -33,7 +33,7 @@
  }
  
  message LogLine {
-     bytes raw_data = 1;
+     string inner = 1;
      uint64 ts = 2;
      string app = 3;
      bool structured = 4;
