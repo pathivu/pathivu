@@ -1,4 +1,4 @@
-<img src="docs/img/pathivu.jpeg" height="250" width="200" style="display: block;
+<img src="docs/img/pathivu.jpeg"  style="display: block;
   margin-left: auto;
   margin-right: auto;
   width: 50%;">    
