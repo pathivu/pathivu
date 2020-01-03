@@ -68,7 +68,7 @@ spec:
         image: schoolboy/fluentd-example
         env:
          - name: CHOLA_URL
-           value: "http://chola.kube-logging.svc.cluster.local:5180"
+           value: "chola.kube-logging.svc.cluster.local:6180"
         resources:
           limits:
             memory: 200Mi

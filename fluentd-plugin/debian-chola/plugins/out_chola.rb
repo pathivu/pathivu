@@ -29,18 +29,25 @@
 #   limitations under the License.
 #  
 
+
+this_dir = File.expand_path(File.dirname(__FILE__))
+lib_dir = File.join(File.dirname(this_dir), 'lib')
+$LOAD_PATH.unshift(lib_dir) unless $LOAD_PATH.include?(lib_dir)
+
 require 'fluent/plugin/output'
 require 'uea-stemmer'
 require 'stopwords'
 require 'yajl'
 require 'net/http'
+require_relative 'api_services_pb'
+require 'grpc'
 
+include Api
 module Fluent::Plugin
   class CholaOutput < Output
     Fluent::Plugin.register_output('chola', self)
-
     helpers :inject, :formatter, :compat_parameters
-
+    @@client = nil
     DEFAULT_LINE_FORMAT_TYPE = 'stdout'
     DEFAULT_FORMAT_TYPE = 'json'
 
@@ -66,8 +73,48 @@ module Fluent::Plugin
       false
     end
 
+    def flatten_hash(hash)
+      hash.each_with_object({}) do |(k, v), h|
+        if v.is_a? Hash
+          flatten_hash(v).map do |h_k, h_v|
+            h["#{k}.#{h_k}".to_sym] = h_v
+          end
+        else 
+          h[k] = v
+        end
+      end
+    end
+  
+   def build_indexes(flattened_data)
+      stemmer = UEAStemmer.new
+      indexes = []
+      flattened_data.each do|key,value|
+          if value.kind_of?(Array)
+              value.each do|inner|
+                  splits = inner.gsub(/\s+/m, ' ').strip.split(" ")
+                  splits.each do|item|
+                    if !Stopwords.is?(item)
+                      indexes.push(stemmer.stem(item))
+                    end
+                  end
+              end  
+          else
+            splits = value.gsub(/\s+/m, ' ').strip.split(" ")
+            splits.each do|item|
+              if !Stopwords.is?(item)
+                indexes.push(stemmer.stem(item))
+              end
+            end
+          end    
+        end
+      return indexes
+    end
+
     def write(chunk)
-        stemmer = UEAStemmer.new
+        if @@client == nil
+          @@client = Api::Pathivu::Stub.new(url, :this_channel_is_insecure)
+        end
+
         partitions = {}
         chunk.each do |time, record|
             unless record.is_a?(Hash)
@@ -76,39 +123,19 @@ module Fluent::Plugin
                         'A log record should be in JSON format.'
               next
             end
-            splits = record["log"].gsub(/\s+/m, ' ').strip.split(" ")
-            indexes = []
-            splits.each do|item|
-              if !Stopwords.is?(item)
-                indexes.push(stemmer.stem(item))
-              end
-            end
+            flattened_hash = self.flatten_hash(record)
+            indexes = self.build_indexes(flattened_hash)
+            line = PushLogLine::new(ts: Time.at(time.to_f).to_i, indexes: indexes, structured: true, json_keys: flattened_hash.keys, raw_data: Yajl.dump(record))
             if !partitions.key?(record["kubernetes"]["pod_name"])
               partitions[record["kubernetes"]["pod_name"]] = []
             end
-            partitions[record["kubernetes"]["pod_name"]].push({"line": record["log"], "ts": Time.at(time.to_f).to_i, "indexes":indexes})
+            partitions[record["kubernetes"]["pod_name"]].push(line)
         end
         #post each parition
-        partitions.each do|parition, entries|
-          uri = URI.parse(url + '/push')
-          req = Net::HTTP::Post.new(
-            uri.request_uri
-          )
-          req.add_field('Content-Type', 'application/json')
-          data = { "app" => parition,"lines" => entries}
-          req.body = Yajl.dump(data)
-          res = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(req) }
-          unless res&.is_a?(Net::HTTPSuccess)
-          res_summary = if res
-                          "#{res.code} #{res.message} #{res.body}"
-                        else
-                          'res=nil'
-                        end
-          log.warn "failed to #{req.method} #{uri} (#{res_summary})"
-          log.warn Yajl.dump(data)
-          end
+        partitions.each do|partition, lines|
+          req = PushRequest::new(source: partition, lines: lines)
+          @@client.push(req)
         end
-
     end
   end
 end

@@ -23,3 +23,8 @@ protoc --go_out=plugins=grpc:. api.proto
 cp api.pb.go ../katchi/api
 cp api.pb.go ../misc/api
 rm api.pb.go
+
+# generate for ruby
+grpc_tools_ruby_protoc -I . --ruby_out=. --grpc_out=. api.proto 
+mv api_pb.rb ../fluentd-plugin/debian-chola-plugins
+mv api_service_pb.rb ../fluentd-plugin/debian-chola-plugins
