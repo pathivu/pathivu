@@ -13,14 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-unstructured = {"message" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ string}
-flattend_key = {(ASCII_ALPHANUMERIC+ ~".")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+}
+ unstructured = {"message" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ string}
+
+json_key_char ={
+    (!("\"" | "\\" | ")" | " ") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4}) )
+}
+json_key = {json_key_char+}
+flattend_key = {(json_key+ ~".")+ ~ json_key+ | json_key+}
 structured = {flattend_key+ ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ string}
 source = {"source" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~  ((variable ~",")+ ~ variable | variable)}
-count = {("count("~variable~") as "~variable ~" by " ~ variable)| 
- ("count("~variable~") as "~variable)}
-distinct = {"distinct("~variable~") as "~variable}
+count = {("count("~flattend_key~") as "~variable ~" by " ~ flattend_key)| 
+ ("count("~flattend_key~") as "~variable)}
+distinct = {"distinct("~flattend_key~") as "~variable}
 string = ${ "\"" ~ inner ~ "\"" }
 char = {
     !("\"" | "\\") ~ ANY
@@ -30,8 +36,8 @@ char = {
 
 inner = @{ char* }
 variable = {(ASCII_ALPHANUMERIC+ ~"_")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+}
-distinct_count = {"distinct_count("~variable~") as "~variable}
-average = {("avg("~variable+~") as "~variable+ ~ " by " ~ variable) | ("avg("~variable+~") as "~variable)}
+distinct_count = {"distinct_count("~flattend_key~") as "~variable}
+average = {("avg("~flattend_key+~") as "~variable+ ~ " by " ~ flattend_key) | ("avg("~flattend_key+~") as "~variable)}
 number = {DECIMAL_NUMBER+}
 limit = {"limit "~ number}
 query_block = {source | count | distinct|distinct_count|average | limit| unstructured | structured}

@@ -290,13 +290,13 @@ pub mod tests {
     #[test]
     fn test_selection() {
         // unstructured selection assertion
-        let query = parse(String::from("message=\"pathivu\"")).unwrap();
+        let query = parse(String::from("message = \"pathivu\"")).unwrap();
         let selection = query.selection.unwrap();
         assert_eq!(selection.value, "pathivu");
         assert_eq!(selection.structured, false);
 
         // structured selection assertion
-        let query = parse(String::from("name.location=\"kumari kandam\"")).unwrap();
+        let query = parse(String::from("name.location = \"kumari kandam\"")).unwrap();
         let selection = query.selection.unwrap();
         assert_eq!(selection.value, "kumari kandam");
         assert_eq!(selection.structured, true);
@@ -330,9 +330,12 @@ pub mod tests {
         assert_eq!(distinct.alias, "unique_country");
         assert_eq!(distinct.count, false);
         // distinct_count assertion.
-        let query = parse(String::from("distinct_count(country) as unique_country")).unwrap();
+        let query = parse(String::from(
+            "distinct_count(country.hello/world) as unique_country",
+        ))
+        .unwrap();
         let distinct = query.distinct.unwrap();
-        assert_eq!(distinct.attr, "country");
+        assert_eq!(distinct.attr, "country.hello/world");
         assert_eq!(distinct.alias, "unique_country");
         assert_eq!(distinct.count, true);
     }
