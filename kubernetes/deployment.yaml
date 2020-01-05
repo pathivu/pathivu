@@ -18,10 +18,6 @@ spec:
       containers:
       - name: chola
         image: schoolboy/chola-nightly  # or just image: redis
-        resources:
-          requests:
-            cpu: 100m
-            memory: 100Mi
         ports:
         - containerPort: 5180
         - containerPort: 6180

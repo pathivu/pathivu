@@ -267,6 +267,9 @@ impl<S: Store + Clone> QueryExecutor<S> {
             match itr.entry() {
                 None => break,
                 Some(entry) => {
+                    if query.limit != 0 && (query.limit as usize) < lines.len() {
+                        break;
+                    }
                     lines.push(ResLine {
                         ts: entry.ts,
                         line: String::from_utf8(entry.line.clone()).unwrap(),
