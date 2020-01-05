@@ -16,6 +16,7 @@
 use failure::Error;
 use simd_json;
 use simd_json::value::borrowed::Value;
+use std::collections::VecDeque;
 /// get_value_from_json is used to get value of the given json from the flattened key.
 pub fn get_value_from_json(key: String, json: &mut [u8]) -> Result<Option<Value>, Error> {
     //TODO: this function should split into two, where we give the simd_json object becacuse
@@ -24,23 +25,33 @@ pub fn get_value_from_json(key: String, json: &mut [u8]) -> Result<Option<Value>
     // json key.
     let mut json: simd_json::BorrowedValue = simd_json::to_borrowed_value(json)?;
     // Now recursively find value of the given flattened key.
-    let path: Vec<&str> = key.split(".").collect();
-    let path_len = path.len();
-    let mut traversed_len = 0;
-
-    for key in path {
+    let mut path: VecDeque<&str> = key.split(".").collect();
+    let mut key = path.pop_front().unwrap();
+    'outer: loop {
         match json {
             Value::Object(mut obj) => {
-                if let Some(inner) = obj.remove(key) {
-                    traversed_len = traversed_len + 1;
-                    json = inner;
-                    if traversed_len == path_len {
-                        // We're at the end of the traversal. So return here.
-                        return Ok(Some(json));
+                // I'm using this variable to capture the reference of the combined key. If you have
+                // better idea. Please do it.
+                let mut holder = String::from("");
+                'inner: loop {
+                    if let Some(inner) = obj.remove(key) {
+                        json = inner;
+                        if path.len() == 0 {
+                            // We're at the end of the traversal. So return here.
+                            return Ok(Some(json));
+                        }
+                        key = path.pop_front().unwrap();
+                        continue 'outer;
                     }
-                    continue;
+                    if path.len() == 0 {
+                        break 'outer;
+                    }
+                    // If there is no key, append the next part and check for it. Beacuse,
+                    // json keys may contain dot. For example k8s.io/stream. Yeah, bit wierd,
+                    // This is the way it works.
+                    holder = format!("{}.{}", key, path.pop_front().unwrap());
+                    key = &holder;
                 }
-                break;
             }
             _ => {
                 // We can only traverse over objects so breaking here.
@@ -100,5 +111,31 @@ pub mod tests {
         // Array assertion.
         let val = get_value_from_json("skills.ram".to_string(), &mut json).unwrap();
         assert_eq!(None, val);
+    }
+
+    #[test]
+    fn test_dotted_json() {
+        let mut json = br#"{
+            "name": "Licenser",
+            "skills": {
+                "language.name": "Rust"
+            },
+            "k8s.io/source":{
+                "name": "cluster"
+            }
+        }"#
+        .to_vec();
+
+        let val = get_value_from_json("skills.language.name".to_string(), &mut json).unwrap();
+        assert_eq!(
+            Value::String(std::borrow::Cow::Borrowed("Rust")),
+            val.unwrap()
+        );
+        // 2 level nesting.
+        let val = get_value_from_json("k8s.io/source.name".to_string(), &mut json).unwrap();
+        assert_eq!(
+            Value::String(std::borrow::Cow::Borrowed("cluster")),
+            val.unwrap()
+        );
     }
 }
