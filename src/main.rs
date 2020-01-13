@@ -27,6 +27,7 @@ mod queryexecutor;
 mod replayer;
 mod server;
 mod store;
+mod telementry;
 mod types;
 mod util;
 use simplelog::*;
@@ -37,5 +38,10 @@ fn main() {
     //     TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Mixed).unwrap(),
     // ])
     // .unwrap();
+
+    // Send telementry for analytics.
+    telementry::telementry::send_telementry();
+    // TODO: refactor server to loose couple ingester and query executor from
+    // server.
     server::server::Server::start();
 }
