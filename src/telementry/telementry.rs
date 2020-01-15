@@ -62,7 +62,6 @@ pub fn send_telementry() {
             };
 
             let body = serde_json::to_string(&body).unwrap();
-            println!("{}", body);
             Request::post("https://api.amplitude.com/2/httpapi")
                 .header("Content-Type", "application/json")
                 .timeout(Duration::from_secs(5))
