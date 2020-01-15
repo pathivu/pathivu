@@ -210,7 +210,12 @@ impl<S: Store + Clone> Ingester<S> {
                         });
                     }
                     match block_on(async {
-                        tailer.send(Ok(api::QueryResponse { lines: lines })).await
+                        tailer
+                            .send(Ok(api::QueryResponse {
+                                lines: lines,
+                                json: String::from(""),
+                            }))
+                            .await
                     }) {
                         Ok(_) => true,
                         Err(_) => {

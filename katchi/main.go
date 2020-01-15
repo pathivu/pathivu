@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/tidwall/pretty"
 	"google.golang.org/grpc"
 )
 
@@ -42,6 +43,14 @@ import (
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+func printLogs(lines []*api.LogLine) {
+	for _, line := range lines {
+		fmt.Printf("APP: %s, ts: %s, line: %s \n", line.App, time.Unix(int64(line.Ts), 0).String(),
+			line.Inner)
+	}
+}
+
 type client struct {
 	conn *grpc.ClientConn
 }
@@ -62,7 +71,7 @@ func (c *client) CloseConn() error {
 
 func (c *client) partitions() []string {
 	pathivuClient := api.NewPathivuClient(c.conn)
-	res, err := pathivuClient.Partitions(context.Background(), &api.PartitionRequest{})
+	res, err := pathivuClient.Partitions(context.Background(), &api.Empty{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,12 +117,6 @@ var startTs int64
 
 var endTs int64
 
-func printLogs(lines []*api.LogLine) {
-	for _, line := range lines {
-		fmt.Printf("APP: %s, ts: %s, line: %s \n", line.App, time.Unix(int64(line.Ts), 0).String(), line.Line)
-	}
-}
-
 func main() {
 	req = new(api.QueryRequest)
 	since = (time.Second * 0)
@@ -139,7 +142,7 @@ func main() {
 			}
 			req.Forward = false
 			res := c.query(req)
-			printLogs(res.Lines)
+			fmt.Println(string(pretty.Pretty([]byte(res.Json))))
 		},
 	}
 	queryCmd.Flags().DurationVar(&since, "since", time.Second*0, "since=1h")

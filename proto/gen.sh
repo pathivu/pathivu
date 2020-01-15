@@ -26,5 +26,5 @@ rm api.pb.go
 
 # generate for ruby
 grpc_tools_ruby_protoc -I . --ruby_out=. --grpc_out=. api.proto 
-mv api_pb.rb ../fluentd-plugin/debian-chola-plugins
-mv api_service_pb.rb ../fluentd-plugin/debian-chola-plugins
+mv api_pb.rb ../fluentd-plugin/debian-chola/plugins/api_pb.rb
+mv api_services_pb.rb ../fluentd-plugin/debian-chola/plugins/api_services_pb.rb

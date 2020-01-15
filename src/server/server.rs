@@ -91,32 +91,14 @@ impl api::server::Pathivu for PathivuGrpcServer {
     ) -> Result<TonicResponse<api::QueryResponse>, Status> {
         let req = req.into_inner();
         // convert into executor request.
-        let executor_req = QueryRequest {
-            partitions: req.partitions,
-            start_ts: req.start_ts,
-            end_ts: req.end_ts,
-            count: req.count,
-            offset: req.offset,
-            forward: req.forward,
-            query: req.query,
-        };
         let mut executor = self.query_executor.clone();
-        let res = executor.execute(executor_req);
+        let res = executor.execute(req.query, req.start_ts, req.end_ts, req.forward);
         match res {
-            Ok(mut query_res) => {
-                // convert query response into grpc response.
-                // let mut lines = Vec::new();
-                // for line in query_res.lines.drain(..) {
-                //     lines.push(api::LogLine {
-                //         line: line.line,
-                //         ts: line.ts,
-                //         app: line.app,
-                //     });
-                // }
-                // JSON needs to be changed here
-                Ok(TonicResponse::new(api::QueryResponse::default()))
-            }
-            Err(err_msg) => Err(Status::new(Code::Internal, err_msg)),
+            Ok(mut query_res) => Ok(TonicResponse::new(api::QueryResponse {
+                json: query_res,
+                lines: Vec::default(),
+            })),
+            Err(err_msg) => Err(Status::new(Code::Internal, format!("{}", err_msg))),
         }
     }
 
@@ -181,7 +163,7 @@ struct QueryHandler {
 impl QueryHandler {
     fn execute(&mut self, req: QueryRequest) -> Result<String, failure::Error> {
         self.executor
-            .execute_sql_query(req.query, req.start_ts, req.end_ts, req.forward)
+            .execute(req.query, req.start_ts, req.end_ts, req.forward)
     }
 }
 
