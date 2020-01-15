@@ -71,8 +71,14 @@ impl<S: Store + Clone> QueryExecutor<S> {
         start_ts: u64,
         end_ts: u64,
         forward: bool,
+        limit: u64,
     ) -> Result<String, failure::Error> {
-        let query = parser::parse(query)?;
+        let mut query = parser::parse(query)?;
+
+        // We'll give more precedence for request limit.
+        if limit != 0 {
+            query.limit = limit;
+        }
         let mut itrs = Vec::new();
         let mut partitions = query.soruces;
         // If there is no partitions mentioned then we have to query all
@@ -185,7 +191,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
             match itr.entry() {
                 None => break,
                 Some(entry) => {
-                    if query.limit != 0 && (query.limit as usize) < lines.len() {
+                    if query.limit != 0 && (query.limit as usize) <= lines.len() {
                         break;
                     }
                     lines.push(ResLine {

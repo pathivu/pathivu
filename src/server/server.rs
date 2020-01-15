@@ -92,9 +92,9 @@ impl api::server::Pathivu for PathivuGrpcServer {
         let req = req.into_inner();
         // convert into executor request.
         let mut executor = self.query_executor.clone();
-        let res = executor.execute(req.query, req.start_ts, req.end_ts, req.forward);
+        let res = executor.execute(req.query, req.start_ts, req.end_ts, req.forward, req.count);
         match res {
-            Ok(mut query_res) => Ok(TonicResponse::new(api::QueryResponse {
+            Ok(query_res) => Ok(TonicResponse::new(api::QueryResponse {
                 json: query_res,
                 lines: Vec::default(),
             })),
@@ -143,7 +143,7 @@ impl api::server::Pathivu for PathivuGrpcServer {
 #[derive(Clone)]
 struct HelloHandler {}
 impl Handler for HelloHandler {
-    fn handle(mut self, mut state: State) -> Box<HandlerFuture> {
+    fn handle(self, state: State) -> Box<HandlerFuture> {
         let res = format!("Hi from chola").into_response(&state);
         Box::new(oldfuture::future::ok((state, res)))
     }
@@ -163,7 +163,7 @@ struct QueryHandler {
 impl QueryHandler {
     fn execute(&mut self, req: QueryRequest) -> Result<String, failure::Error> {
         self.executor
-            .execute(req.query, req.start_ts, req.end_ts, req.forward)
+            .execute(req.query, req.start_ts, req.end_ts, req.forward, req.count)
     }
 }
 
