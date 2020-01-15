@@ -15,6 +15,7 @@ Google::Protobuf::DescriptorPool.generated_pool.build do
   end
   add_message "api.QueryResponse" do
     repeated :lines, :message, 1, "api.LogLine"
+    optional :json, :string, 2
   end
   add_message "api.LogLine" do
     optional :inner, :string, 1

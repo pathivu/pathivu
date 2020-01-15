@@ -20,6 +20,7 @@ require (
 	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/objx v0.2.0 // indirect
+	github.com/tidwall/pretty v1.0.0
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20191128160524-b544559bb6d1 // indirect
 	golang.org/x/exp v0.0.0-20191129062945-2f5052295587 // indirect

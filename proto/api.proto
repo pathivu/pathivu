@@ -30,6 +30,7 @@
  
  message QueryResponse {
      repeated LogLine lines = 1;
+     string json = 2;
  }
  
  message LogLine {
