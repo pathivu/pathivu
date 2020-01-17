@@ -14,3 +14,4 @@
  * limitations under the License.
  */
 pub mod ingester;
+pub mod manager;

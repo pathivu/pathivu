@@ -21,6 +21,7 @@ use crate::store::rocks_store;
 use crate::store::store::Store;
 use crate::types::types::*;
 
+use crate::ingester::manager::Manager;
 use api::server::PathivuServer;
 use failure::bail;
 use futures::channel::mpsc;
@@ -55,7 +56,7 @@ use tokio::runtime::Runtime;
 use tonic;
 use tonic::{transport::Server as TonicServer, Code, Request, Response as TonicResponse, Status};
 struct PathivuGrpcServer {
-    ingester_transport: Sender<IngesterRequest>,
+    ingester_manager: Manager,
     query_executor: QueryExecutor<rocks_store::RocksStore>,
     partition_path: String,
 }
@@ -70,16 +71,8 @@ impl api::server::Pathivu for PathivuGrpcServer {
     ) -> Result<TonicResponse<Self::TailStream>, Status> {
         let (tx, rx) = mpsc::channel(100);
         let req = req.into_inner();
-        let tailer_req = TailerRequest {
-            partitions: req.partitions,
-            sender: tx,
-        };
-        let mut ingester_transport = self.ingester_transport.clone();
-        if let Err(e) = block_on(async {
-            ingester_transport
-                .send(IngesterRequest::RegisterTailer(tailer_req))
-                .await
-        }) {
+        let mut ingester_transport = self.ingester_manager.clone();
+        if let Err(e) = ingester_transport.register_tailer(req.partitions, tx) {
             return Err(Status::new(Code::Internal, format!("{}", e)));
         }
         Ok(TonicResponse::new(rx))
@@ -119,14 +112,14 @@ impl api::server::Pathivu for PathivuGrpcServer {
         &self,
         req: Request<api::PushRequest>,
     ) -> Result<TonicResponse<api::Empty>, Status> {
-        let mut sender = self.ingester_transport.clone();
+        let mut manager = self.ingester_manager.clone();
         if let Err(e) = block_on(async {
             let (complete_sender, complete_receiver) = oneshot::channel();
-            let ingester_req = IngesterRequest::Push(IngesterPush {
+            let ingester_req = IngesterPush {
                 push_request: req.into_inner(),
                 complete_signal: complete_sender,
-            });
-            if let Err(e) = sender.send(ingester_req).await {
+            };
+            if let Err(e) = manager.ingest(ingester_req).await {
                 return Err(format!("{}", e));
             }
             if let Err(e) = complete_receiver.await {
@@ -310,15 +303,11 @@ impl Server {
         replayer.replay()?;
         drop(replayer);
 
-        let (mut sender, receiver) = mpsc::channel(1000);
-        let mut ingester = Ingester::new(receiver, cfg.clone(), store.clone());
-        thread::spawn(move || {
-            ingester.start();
-        });
-        let executor = QueryExecutor::new(cfg.clone(), sender.clone(), store);
+        let manager = Manager::new(cfg.clone(), store.clone());
+        let executor = QueryExecutor::new(cfg.clone(), manager.clone(), store);
         let addr = "0.0.0.0:6180".parse().unwrap();
         let pathivu_grpc = PathivuGrpcServer {
-            ingester_transport: sender,
+            ingester_manager: manager,
             query_executor: executor.clone(),
             partition_path: cfg.dir.clone(),
         };
