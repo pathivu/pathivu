@@ -26,10 +26,10 @@ pub mod api {
 use api::QueryResponse as PbQueryResponse;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LogLine {
-    pub line: String,
+    pub raw_data: String,
     pub ts: u64,
     pub indexes: Vec<String>,
-    pub json: bool,
+    pub structured: bool,
     // always push flattened json keys.
     pub json_keys: Vec<String>,
 }
@@ -65,7 +65,7 @@ pub struct QueryResponse {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PushRequest {
-    pub app: String,
+    pub source: String,
     pub lines: Vec<LogLine>,
 }
 

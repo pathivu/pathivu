@@ -150,6 +150,96 @@ impl NewHandler for HelloHandler {
     }
 }
 
+#[derive(Clone)]
+struct PushHandler {
+    manager: Manager,
+}
+impl NewHandler for PushHandler {
+    type Instance = Self;
+
+    fn new_handler(&self) -> GothamResult<Self::Instance> {
+        Ok(self.clone())
+    }
+}
+impl Handler for PushHandler {
+    fn handle(self, mut state: State) -> Box<HandlerFuture> {
+        let mut manager = self.manager.clone();
+        let fut = Body::take_from(&mut state)
+            .concat2()
+            .then(move |body| match body {
+                Ok(body) => {
+                    let result = serde_json::from_slice::<PushRequest>(&body.to_vec());
+                    match result {
+                        Ok(req) => {
+                            let mut lines = Vec::new();
+                            for line in req.lines {
+                                lines.push(api::PushLogLine {
+                                    structured: line.structured,
+                                    indexes: line.indexes,
+                                    json_keys: line.json_keys,
+                                    ts: line.ts,
+                                    raw_data: line.raw_data.into_bytes(),
+                                })
+                            }
+                            let push_req = api::PushRequest {
+                                source: req.source,
+                                lines: lines,
+                            };
+                            if let Err(e) = block_on(async {
+                                let (complete_sender, complete_receiver) = oneshot::channel();
+                                let ingester_req = IngesterPush {
+                                    push_request: push_req,
+                                    complete_signal: complete_sender,
+                                };
+                                if let Err(e) = manager.ingest(ingester_req).await {
+                                    return Err(format!("{}", e));
+                                }
+                                if let Err(e) = complete_receiver.await {
+                                    return Err(format!("{}", e));
+                                }
+                                return Ok(());
+                            }) {
+                                let res = create_response(
+                                    &state,
+                                    StatusCode::NOT_ACCEPTABLE,
+                                    mime::TEXT_PLAIN,
+                                    format!("{}", e),
+                                );
+                                return oldfuture::future::ok((state, res));
+                            }
+                        }
+                        Err(e) => {
+                            let res = create_response(
+                                &state,
+                                StatusCode::NOT_ACCEPTABLE,
+                                mime::TEXT_PLAIN,
+                                format!("{}", e),
+                            );
+                            return oldfuture::future::ok((state, res));
+                        }
+                    }
+                    let res = create_response(
+                        &state,
+                        StatusCode::CREATED,
+                        mime::TEXT_PLAIN,
+                        format!("ok"),
+                    );
+                    return oldfuture::future::ok((state, res));
+                }
+                Err(e) => {
+                    let res = create_response(
+                        &state,
+                        StatusCode::NOT_ACCEPTABLE,
+                        mime::TEXT_PLAIN,
+                        format!("{}", e),
+                    );
+                    return oldfuture::future::ok((state, res));
+                }
+            });
+        Box::new(fut)
+    }
+}
+
 struct QueryHandler {
     executor: QueryExecutor<rocks_store::RocksStore>,
 }
@@ -279,6 +369,8 @@ impl NewHandler for PartitionHandler {
 
 impl RefUnwindSafe for QueryHandler {}
 
+impl RefUnwindSafe for PushHandler {}
+
 impl NewHandler for QueryHandler {
     type Instance = Self;
 
@@ -307,7 +399,7 @@ impl Server {
         let executor = QueryExecutor::new(cfg.clone(), manager.clone(), store);
         let addr = "0.0.0.0:6180".parse().unwrap();
         let pathivu_grpc = PathivuGrpcServer {
-            ingester_manager: manager,
+            ingester_manager: manager.clone(),
             query_executor: executor.clone(),
             partition_path: cfg.dir.clone(),
         };
@@ -327,7 +419,9 @@ impl Server {
         let addr = "0.0.0.0:5180";
         println!("Listening for requests at http://{}", addr);
         let router = build_simple_router(|route| {
-            //route.post("/push").to_new_handler(PushHandler::new(sender));
+            route
+                .post("/push")
+                .to_new_handler(PushHandler { manager: manager });
             route.get("/hello").to_new_handler(HelloHandler {});
             route
                 .post("/query")
