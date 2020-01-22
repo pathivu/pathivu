@@ -21,6 +21,7 @@ use crate::store::rocks_store;
 use crate::store::store::Store;
 use crate::types::types::*;
 
+use crate::ingester::manager::Manager;
 use api::server::PathivuServer;
 use failure::bail;
 use futures::channel::mpsc;
@@ -55,7 +56,7 @@ use tokio::runtime::Runtime;
 use tonic;
 use tonic::{transport::Server as TonicServer, Code, Request, Response as TonicResponse, Status};
 struct PathivuGrpcServer {
-    ingester_transport: Sender<IngesterRequest>,
+    ingester_manager: Manager,
     query_executor: QueryExecutor<rocks_store::RocksStore>,
     partition_path: String,
 }
@@ -70,16 +71,8 @@ impl api::server::Pathivu for PathivuGrpcServer {
     ) -> Result<TonicResponse<Self::TailStream>, Status> {
         let (tx, rx) = mpsc::channel(100);
         let req = req.into_inner();
-        let tailer_req = TailerRequest {
-            partitions: req.partitions,
-            sender: tx,
-        };
-        let mut ingester_transport = self.ingester_transport.clone();
-        if let Err(e) = block_on(async {
-            ingester_transport
-                .send(IngesterRequest::RegisterTailer(tailer_req))
-                .await
-        }) {
+        let mut ingester_transport = self.ingester_manager.clone();
+        if let Err(e) = ingester_transport.register_tailer(req.partitions, tx) {
             return Err(Status::new(Code::Internal, format!("{}", e)));
         }
         Ok(TonicResponse::new(rx))
@@ -119,14 +112,14 @@ impl api::server::Pathivu for PathivuGrpcServer {
         &self,
         req: Request<api::PushRequest>,
     ) -> Result<TonicResponse<api::Empty>, Status> {
-        let mut sender = self.ingester_transport.clone();
+        let mut manager = self.ingester_manager.clone();
         if let Err(e) = block_on(async {
             let (complete_sender, complete_receiver) = oneshot::channel();
-            let ingester_req = IngesterRequest::Push(IngesterPush {
+            let ingester_req = IngesterPush {
                 push_request: req.into_inner(),
                 complete_signal: complete_sender,
-            });
-            if let Err(e) = sender.send(ingester_req).await {
+            };
+            if let Err(e) = manager.ingest(ingester_req).await {
                 return Err(format!("{}", e));
             }
             if let Err(e) = complete_receiver.await {
@@ -154,6 +147,96 @@ impl NewHandler for HelloHandler {
 
     fn new_handler(&self) -> GothamResult<Self::Instance> {
         Ok(self.clone())
+    }
+}
+
+#[derive(Clone)]
+struct PushHandler {
+    manager: Manager,
+}
+impl NewHandler for PushHandler {
+    type Instance = Self;
+
+    fn new_handler(&self) -> GothamResult<Self::Instance> {
+        Ok(self.clone())
+    }
+}
+impl Handler for PushHandler {
+    fn handle(self, mut state: State) -> Box<HandlerFuture> {
+        let mut manager = self.manager.clone();
+        let fut = Body::take_from(&mut state)
+            .concat2()
+            .then(move |body| match body {
+                Ok(body) => {
+                    let result = serde_json::from_slice::<PushRequest>(&body.to_vec());
+                    match result {
+                        Ok(req) => {
+                            let mut lines = Vec::new();
+                            for line in req.lines {
+                                lines.push(api::PushLogLine {
+                                    structured: line.structured,
+                                    indexes: line.indexes,
+                                    json_keys: line.json_keys,
+                                    ts: line.ts,
+                                    raw_data: line.raw_data.into_bytes(),
+                                })
+                            }
+                            let push_req = api::PushRequest {
+                                source: req.source,
+                                lines: lines,
+                            };
+                            if let Err(e) = block_on(async {
+                                let (complete_sender, complete_receiver) = oneshot::channel();
+                                let ingester_req = IngesterPush {
+                                    push_request: push_req,
+                                    complete_signal: complete_sender,
+                                };
+                                if let Err(e) = manager.ingest(ingester_req).await {
+                                    return Err(format!("{}", e));
+                                }
+                                if let Err(e) = complete_receiver.await {
+                                    return Err(format!("{}", e));
+                                }
+                                return Ok(());
+                            }) {
+                                let res = create_response(
+                                    &state,
+                                    StatusCode::NOT_ACCEPTABLE,
+                                    mime::TEXT_PLAIN,
+                                    format!("{}", e),
+                                );
+                                return oldfuture::future::ok((state, res));
+                            }
+                        }
+                        Err(e) => {
+                            let res = create_response(
+                                &state,
+                                StatusCode::NOT_ACCEPTABLE,
+                                mime::TEXT_PLAIN,
+                                format!("{}", e),
+                            );
+                            return oldfuture::future::ok((state, res));
+                        }
+                    }
+                    let res = create_response(
+                        &state,
+                        StatusCode::CREATED,
+                        mime::TEXT_PLAIN,
+                        format!("ok"),
+                    );
+                    return oldfuture::future::ok((state, res));
+                }
+                Err(e) => {
+                    let res = create_response(
+                        &state,
+                        StatusCode::NOT_ACCEPTABLE,
+                        mime::TEXT_PLAIN,
+                        format!("{}", e),
+                    );
+                    return oldfuture::future::ok((state, res));
+                }
+            });
+        Box::new(fut)
     }
 }
 
@@ -286,6 +369,8 @@ impl NewHandler for PartitionHandler {
 
 impl RefUnwindSafe for QueryHandler {}
 
+impl RefUnwindSafe for PushHandler {}
+
 impl NewHandler for QueryHandler {
     type Instance = Self;
 
@@ -310,15 +395,11 @@ impl Server {
         replayer.replay()?;
         drop(replayer);
 
-        let (mut sender, receiver) = mpsc::channel(1000);
-        let mut ingester = Ingester::new(receiver, cfg.clone(), store.clone());
-        thread::spawn(move || {
-            ingester.start();
-        });
-        let executor = QueryExecutor::new(cfg.clone(), sender.clone(), store);
+        let manager = Manager::new(cfg.clone(), store.clone());
+        let executor = QueryExecutor::new(cfg.clone(), manager.clone(), store);
         let addr = "0.0.0.0:6180".parse().unwrap();
         let pathivu_grpc = PathivuGrpcServer {
-            ingester_transport: sender,
+            ingester_manager: manager.clone(),
             query_executor: executor.clone(),
             partition_path: cfg.dir.clone(),
         };
@@ -338,7 +419,9 @@ impl Server {
         let addr = "0.0.0.0:5180";
         println!("Listening for requests at http://{}", addr);
         let router = build_simple_router(|route| {
-            //route.post("/push").to_new_handler(PushHandler::new(sender));
+            route
+                .post("/push")
+                .to_new_handler(PushHandler { manager: manager });
             route.get("/hello").to_new_handler(HelloHandler {});
             route
                 .post("/query")

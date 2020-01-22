@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 use crate::config::config::Config;
+use crate::ingester::manager::Manager;
 use crate::iterator::merge_iterator::MergeIteartor;
 use crate::json_parser::parser::get_value_from_json;
 use crate::parser::parser;
@@ -38,7 +39,6 @@ use simd_json::value::tape::StaticNode;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-
 /// DistinctRes gives the distinct value and count of the distinct value.
 struct DistinctRes {
     distinct_count: HashMap<String, u64>,
@@ -48,17 +48,17 @@ struct DistinctRes {
 pub struct QueryExecutor<S: Store + Clone> {
     store: S,
     cfg: Config,
-    ingester_transport: Sender<IngesterRequest>,
+    manager: Manager,
     partition_handler: PartitionHandler,
 }
 
 impl<S: Store + Clone> QueryExecutor<S> {
-    pub fn new(cfg: Config, transport: Sender<IngesterRequest>, store: S) -> QueryExecutor<S> {
+    pub fn new(cfg: Config, manager: Manager, store: S) -> QueryExecutor<S> {
         let path = cfg.dir.clone();
         QueryExecutor {
             store: store,
             cfg: cfg,
-            ingester_transport: transport,
+            manager: manager,
             partition_handler: PartitionHandler {
                 partition_path: path,
             },
@@ -95,6 +95,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
             // hint to the ingester so that it'll flush the buffered segement :)
             // Do you hava any smart way? pls do it here.
 
+            // TODO: batch it.
             let (complete_sender, complete_receiver) = oneshot::channel();
             let hint = IngesterFlushHintReq {
                 app: partition.clone(),
@@ -102,17 +103,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
                 end_ts: end_ts,
                 complete_signal: complete_sender,
             };
-            block_on(async {
-                self.ingester_transport
-                    .send(IngesterRequest::Flush(hint))
-                    .await
-                    .unwrap();
-                if let Err(e) = complete_receiver.await {
-                    return Err(format_err!("{}", e));
-                }
-                Ok(())
-            })?;
-
+            self.manager.send_flush_hint(hint)?;
             // no need to copy store every time. we can do the partition registry
             // retrival here. we can replace, if it is show in the profiles.
             let itr = PartitionIterator::new(
@@ -524,7 +515,7 @@ impl<S: Store + Clone> Clone for QueryExecutor<S> {
         QueryExecutor {
             store: self.store.clone(),
             cfg: self.cfg.clone(),
-            ingester_transport: self.ingester_transport.clone(),
+            manager: self.manager.clone(),
             partition_handler: self.partition_handler.clone(),
         }
     }
@@ -534,6 +525,7 @@ impl<S: Store + Clone> Clone for QueryExecutor<S> {
 pub mod tests {
     use super::*;
     use crate::config::config::Config;
+    use crate::ingester::manager::Manager;
     use crate::iterator::merge_iterator::MergeIteartor;
     use crate::parser::*;
     use crate::partition::partition_iterator::PartitionIterator;
@@ -675,7 +667,11 @@ pub mod tests {
         // create dummy transport for the executor
         let (sender, _) = mpsc::channel(1000);
         // Create executor to test the query.
-        let mut executor = QueryExecutor::new(cfg, sender, store);
+        let manager = Manager {
+            transport: vec![sender],
+            no_of_shard: 1,
+        };
+        let mut executor = QueryExecutor::new(cfg, manager, store);
 
         let distinct = parser::Distinct {
             attr: "skills.language".to_string(),
@@ -795,7 +791,11 @@ pub mod tests {
         // create dummy transport for the executor
         let (sender, _) = mpsc::channel(1000);
         // Create executor to test the query.
-        let executor = QueryExecutor::new(cfg, sender, store);
+        let manager = Manager {
+            transport: vec![sender],
+            no_of_shard: 1,
+        };
+        let executor = QueryExecutor::new(cfg, manager, store);
 
         let average = parser::Average {
             attr: "age".to_string(),
@@ -907,7 +907,11 @@ pub mod tests {
         // create dummy transport for the executor
         let (sender, _) = mpsc::channel(1000);
         // Create executor to test the query.
-        let executor = QueryExecutor::new(cfg, sender, store);
+        let manager = Manager {
+            transport: vec![sender],
+            no_of_shard: 1,
+        };
+        let executor = QueryExecutor::new(cfg, manager, store);
 
         let average = parser::Average {
             attr: "age".to_string(),
@@ -1021,7 +1025,11 @@ pub mod tests {
         // create dummy transport for the executor
         let (sender, _) = mpsc::channel(1000);
         // Create executor to test the query.
-        let executor = QueryExecutor::new(cfg, sender, store);
+        let manager = Manager {
+            transport: vec![sender],
+            no_of_shard: 1,
+        };
+        let executor = QueryExecutor::new(cfg, manager, store);
 
         let count = parser::Count {
             attr: "age".to_string(),
@@ -1133,7 +1141,11 @@ pub mod tests {
         // create dummy transport for the executor
         let (sender, _) = mpsc::channel(1000);
         // Create executor to test the query.
-        let executor = QueryExecutor::new(cfg, sender, store);
+        let manager = Manager {
+            transport: vec![sender],
+            no_of_shard: 1,
+        };
+        let executor = QueryExecutor::new(cfg, manager, store);
 
         let count = parser::Count {
             attr: "age".to_string(),

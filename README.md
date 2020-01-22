@@ -7,7 +7,7 @@
 
 <img alt="Build Status" src="https://github.com/pathivu/pathivu/workflows/Rust/badge.svg" />
 
-Pathivu is a log aggregation system. It does all the indexing. All you have to shoot the query to find, why account transfer failed.
+Pathivu is a log aggregation system. It does indexing in an effective manner. All you have to shoot the query to debug your problem.
 
 Cost-Effective logging at scale.
 
@@ -17,8 +17,8 @@ Not for production use yet. But, you can play around it.
 <p align="center"><img src="docs/tail.gif?raw=true"/></p>
 
 ## Usage
-First run pathivu in your cluster.
 
+Follow the below steps to deploy Pathivu in kubernetes Cluster
 ```
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/namespace.yaml
 
