@@ -43,5 +43,5 @@ fn main() {
     telementry::telementry::send_telementry();
     // TODO: refactor server to loose couple ingester and query executor from
     // server.
-    server::server::Server::start();
+    server::server::Server::start().unwrap();
 }
