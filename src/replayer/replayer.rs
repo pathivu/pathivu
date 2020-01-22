@@ -237,7 +237,7 @@ impl<'a, S: Store> Replayer<'a, S> {
                                     partition_registry.last_assigned = segment_id;
                                 }
                             }
-                            let mut buf: Vec<u8> = vec![0; 1028];
+                            let mut buf: Vec<u8> = Vec::with_capacity(1024);
                             partition_registry
                                 .serialize(&mut Serializer::new(&mut buf))
                                 .unwrap();

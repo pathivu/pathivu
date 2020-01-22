@@ -104,6 +104,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
                 complete_signal: complete_sender,
             };
             self.manager.send_flush_hint(hint)?;
+            block_on(async { complete_receiver.await? })?;
             // no need to copy store every time. we can do the partition registry
             // retrival here. we can replace, if it is show in the profiles.
             let itr = PartitionIterator::new(
