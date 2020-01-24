@@ -18,6 +18,7 @@
 #![feature(type_ascription)]
 #![feature(result_map_or_else)]
 mod config;
+mod cronscheduler;
 mod ingester;
 mod iterator;
 mod json_parser;
@@ -28,6 +29,7 @@ mod replayer;
 mod server;
 mod store;
 mod telementry;
+use std::time::Duration;
 mod types;
 mod util;
 use simplelog::*;
@@ -39,8 +41,13 @@ fn main() {
     // ])
     // .unwrap();
 
-    // Send telementry for analytics.
-    telementry::telementry::send_telementry();
+    // Run all cron jobs.
+    let mut jobs = Vec::new();
+    // Add telementry job.
+    jobs.push(telementry::telementry::TelementryJob {});
+
+    cronscheduler::cron_scheduler::CronScheduler::new(jobs, Duration::from_secs(3600)).start();
+
     // TODO: refactor server to loose couple ingester and query executor from
     // server.
     server::server::Server::start().unwrap();
