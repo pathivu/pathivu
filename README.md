@@ -4,14 +4,48 @@
   width: 50%;">    
 
 # Pathivu: Logs you can search
+<table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
 
-<img alt="Build Status" src="https://github.com/pathivu/pathivu/workflows/Rust/badge.svg" />
+<tr>
+  <td>License</td>
+  <td>
+    <a href="https://github.com/pathivu/pathivu/blob/master/LICENSE">
+    <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
+    </a>
+</td>
+</tr>
+<tr>
+  <td>Build Status</td>
+  <td>
+    <a href="https://github.com/pathivu/pathivu/actions">
+    <img alt="Build Status" src="https://github.com/pathivu/pathivu/workflows/Rust/badge.svg" />
+    </a>
+  </td>
+</tr>
+<tr>
+	<td>Discord</td>
+	<td>
+		<a href="https://discord.gg/PGjRet">
+		<img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
+		</a>
+	</td>
+</tr>
+</table>
 
-Pathivu is a log aggregation system. It does indexing in an effective manner. All you have to shoot the query to debug your problem.
+--- 
 
-Cost-Effective logging at scale.
+Pathivu is powerful log ingestion and aggregation system. It's built from scratch by having cost-efficient and high write throughput in mind without trading log indexing. 
 
-Not for production use yet. But, you can play around it.
+## Highlights
+- Fast Ingestion
+- Beautiful dashboard*
+- Log tailing
+- Log indexing
+- Cost-Efficient
+- Intuitive query language
+
+**  Not yet released. It's on the roadmap
+
 
 
 <p align="center"><img src="docs/tail.gif?raw=true"/></p>
@@ -45,8 +79,3 @@ APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: INFO:
 APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: error: no objects passed to apply
 
 ```
-## Roadmap
-- Multi node support.
-- log shipper for several deploymets
-- crash replayer.
-- Feel free to GitHub issue for feature request.
