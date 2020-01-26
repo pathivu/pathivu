@@ -18,6 +18,7 @@
 #![feature(type_ascription)]
 #![feature(result_map_or_else)]
 mod config;
+mod cronscheduler;
 mod ingester;
 mod iterator;
 mod json_parser;
@@ -28,6 +29,8 @@ mod replayer;
 mod server;
 mod store;
 mod telementry;
+use std::time::Duration;
+mod retention;
 mod types;
 mod util;
 use simplelog::*;
@@ -38,10 +41,28 @@ fn main() {
     //     TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Mixed).unwrap(),
     // ])
     // .unwrap();
+    let cfg = config::config::Config {
+        dir: "/home/schoolboy/cholalog".to_string(),
+        max_segment_size: 100 << 10,
+        max_index_size: 100 << 10,
+        max_batch_size: 20,
+        retention_period: 864000,
+    };
+    let store = store::rocks_store::RocksStore::new(cfg.clone()).unwrap();
 
-    // Send telementry for analytics.
-    telementry::telementry::send_telementry();
+    // Run all cron jobs.
+    let mut jobs: Vec<Box<dyn cronscheduler::cron_scheduler::CronJob + Send>> = Vec::new();
+    // Add telementry job.
+    jobs.push(Box::new(telementry::telementry::TelementryJob {}));
+    // Add Rentention manager.
+    jobs.push(Box::new(retention::retention::RententionManager::new(
+        cfg.clone(),
+        store.clone(),
+    )));
+
+    cronscheduler::cron_scheduler::CronScheduler::new(jobs, Duration::from_secs(3600)).start();
+
     // TODO: refactor server to loose couple ingester and query executor from
     // server.
-    server::server::Server::start().unwrap();
+    server::server::Server::start(cfg, store).unwrap();
 }

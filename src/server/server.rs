@@ -14,44 +14,35 @@
  * limitations under the License.
  */
 use crate::config::config::Config;
-use crate::ingester::ingester::Ingester;
 use crate::queryexecutor::executor::QueryExecutor;
 use crate::replayer::replayer::Replayer;
 use crate::store::rocks_store;
-use crate::store::store::Store;
 use crate::types::types::*;
 
 use crate::ingester::manager::Manager;
 use api::server::PathivuServer;
 use failure::bail;
 use futures::channel::mpsc;
-use futures::channel::mpsc::Sender;
 use futures::channel::oneshot;
 use futures::executor::block_on;
-use futures::sink::SinkExt;
 use gotham;
 use gotham::error::Result as GothamResult;
 use gotham::handler::{Handler, HandlerFuture, IntoHandlerError, IntoResponse, NewHandler};
 use gotham::helpers::http::response::create_response;
 use gotham::router::builder::*;
-use gotham::router::Router;
 use gotham::state::{FromState, State};
-use hyper::{Body, HeaderMap, Method, Response, StatusCode, Uri, Version};
-use log::{debug, info, warn};
+use hyper::{Body, StatusCode};
+use log::info;
 use mime;
 use oldfuture;
 use oldfuture::future::Future;
 use oldfuture::stream::Stream;
-use rocksdb::WriteBatch;
 use std::fs;
 use std::fs::create_dir_all;
-use std::marker::PhantomData;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::SystemTime;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 use tonic;
 use tonic::{transport::Server as TonicServer, Code, Request, Response as TonicResponse, Status};
@@ -312,7 +303,7 @@ pub struct PartitionHandler {
 
 /// get_partitions returns partitions list that has been ingesterd into
 /// pathivu.
-fn get_partitions(path: &String) -> Result<Vec<String>, failure::Error> {
+pub fn get_partitions(path: &String) -> Result<Vec<String>, failure::Error> {
     let path = Path::new(path).join("partition");
     create_dir_all(&path)?;
     let mut partitions = Vec::new();
@@ -338,7 +329,7 @@ impl PartitionHandler {
 }
 
 impl Handler for PartitionHandler {
-    fn handle(mut self, mut state: State) -> Box<HandlerFuture> {
+    fn handle(self, state: State) -> Box<HandlerFuture> {
         match self.partitions() {
             Ok(res) => {
                 let body = serde_json::to_string(&res).expect("Failed to serialise to json");
@@ -381,15 +372,7 @@ impl NewHandler for QueryHandler {
 
 pub struct Server {}
 impl Server {
-    pub fn start() -> Result<(), failure::Error> {
-        let cfg = Config {
-            dir: "/home/schoolboy/cholalog".to_string(),
-            max_segment_size: 100 << 10,
-            max_index_size: 100 << 10,
-            max_batch_size: 20,
-        };
-        let store = rocks_store::RocksStore::new(cfg.clone())?;
-
+    pub fn start(cfg: Config, store: rocks_store::RocksStore) -> Result<(), failure::Error> {
         info!("replaying segment files");
         let mut replayer = Replayer::new(cfg.clone(), store.clone());
         replayer.replay()?;
@@ -404,7 +387,7 @@ impl Server {
             partition_path: cfg.dir.clone(),
         };
         thread::spawn(move || {
-            let mut rt = Runtime::new().unwrap();
+            let rt = Runtime::new().unwrap();
             rt.block_on(async {
                 println!("Listening pathivu grpc server on 6180");
                 TonicServer::builder()
