@@ -84,7 +84,7 @@ pub const UN_STRUCTURED_DATA: u8 = 0b0000_0000;
 // means creator.
 pub const POSTING_LIST_ALL: &str = "!CHOLA!IYANAN";
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct PartitionRegistry {
     pub last_assigned: u64,
     pub segment_files: Vec<SegmentFile>,

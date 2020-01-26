@@ -17,18 +17,18 @@ use std::thread;
 use std::time::Duration;
 /// The CronJob trait allows to execute the cron job.
 pub trait CronJob {
-    fn execute(&self);
+    fn execute(&mut self);
 }
 
 /// The CronScheduler allows to execute job for given interval of time.
-pub struct CronScheduler<T> {
-    jobs: Vec<T>,
+pub struct CronScheduler {
+    jobs: Vec<Box<dyn CronJob + Send>>,
     interval: Duration,
 }
 
-impl<'a, T: CronJob + Send + 'static> CronScheduler<T> {
+impl CronScheduler {
     /// new gives CrobScheduler by taking jobs and duration as an input.
-    pub fn new(jobs: Vec<T>, interval: Duration) -> CronScheduler<T> {
+    pub fn new(jobs: Vec<Box<dyn CronJob + Send>>, interval: Duration) -> CronScheduler {
         CronScheduler {
             jobs: jobs,
             interval: interval,
@@ -36,9 +36,9 @@ impl<'a, T: CronJob + Send + 'static> CronScheduler<T> {
     }
 
     /// start will execute the given job for given interval.
-    pub fn start(self) {
+    pub fn start(mut self) {
         thread::spawn(move || loop {
-            for job in &self.jobs {
+            for job in &mut self.jobs {
                 job.execute();
             }
             thread::sleep(self.interval.clone());

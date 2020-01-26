@@ -39,7 +39,7 @@ struct TelementryRequest<'a> {
 pub struct TelementryJob {}
 
 impl CronJob for TelementryJob {
-    fn execute(&self) {
+    fn execute(&mut self) {
         let username = whoami::username();
         let hostname = whoami::hostname();
         let platform = whoami::platform().to_string();

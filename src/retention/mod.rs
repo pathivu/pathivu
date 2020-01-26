@@ -13,13 +13,4 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use std::time::Duration;
-/// Options for chola.
-#[derive(Clone, Debug)]
-pub struct Config {
-    pub dir: String,
-    pub max_segment_size: u64,
-    pub max_batch_size: u8,
-    pub max_index_size: usize,
-    pub retention_period: u64,
-}
+pub mod retention;

@@ -334,6 +334,7 @@ pub mod tests {
     use crate::types::types::api::PushLogLine;
     use crate::types::types::LogLine;
     use std::path::Path;
+    use std::time::Duration;
     use tempfile;
     pub fn get_test_cfg() -> Config {
         let tmp_dir = tempfile::tempdir().unwrap();
@@ -342,6 +343,7 @@ pub mod tests {
             max_segment_size: 100 << 10,
             max_index_size: 100 << 10,
             max_batch_size: 1,
+            retention_period: 864000,
         }
     }
     pub fn get_test_store(cfg: Config) -> RocksStore {
