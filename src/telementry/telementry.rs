@@ -15,9 +15,8 @@
  */
 use crate::cronscheduler::cron_scheduler::CronJob;
 use isahc::prelude::*;
-use log::{info, warn};
+use log::warn;
 use serde::Serialize;
-use std::thread;
 use std::time::{Duration, SystemTime};
 const API_KEY: &str = "c4854d00f1ac7703a0648ccdad037b9c";
 

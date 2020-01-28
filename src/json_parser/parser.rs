@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use crate::util::util::convert_static_node_to_string;
 use failure::Error;
 use simd_json;
-use simd_json::value::borrowed::Value;
-use std::collections::VecDeque;
+use simd_json::value::borrowed::{Object, Value};
+use std::collections::{HashMap, VecDeque};
 /// get_value_from_json is used to get value of the given json from the flattened key.
 pub fn get_value_from_json(key: String, json: &mut [u8]) -> Result<Option<Value>, Error> {
     //TODO: this function should split into two, where we give the simd_json object becacuse
@@ -61,6 +62,52 @@ pub fn get_value_from_json(key: String, json: &mut [u8]) -> Result<Option<Value>
         }
     }
     Ok(None)
+}
+
+/// deep_flaten_json will deep traverse and flatten the json.
+fn deep_flaten_json(past_key: String, val: Value, past_memory: &mut HashMap<String, Vec<String>>) {
+    let mut collect_memory = |key: String, value: String| {
+        if let Some(vals) = past_memory.get_mut(&key) {
+            vals.push(value);
+            return;
+        }
+        past_memory.insert(key, vec![value]);
+        return;
+    };
+
+    match val {
+        Value::Object(mut obj) => {
+            for (key, value) in obj.drain() {
+                deep_flaten_json(format!("{}.{}", past_key, key), value, past_memory);
+            }
+        }
+        Value::Static(val) => {
+            collect_memory(past_key, convert_static_node_to_string(val).unwrap());
+        }
+        Value::String(val) => {
+            collect_memory(past_key, val.into_owned());
+        }
+        Value::Array(vals) => {
+            for val in vals {
+                deep_flaten_json(past_key.clone(), val, past_memory);
+            }
+        }
+    }
+}
+
+/// flatten_json flatten the given json into key value pair.
+pub fn flatten_json(buf: &mut Vec<u8>) -> Result<HashMap<String, Vec<String>>, failure::Error> {
+    let mut result: HashMap<String, Vec<String>> = HashMap::new();
+    let json: simd_json::BorrowedValue = simd_json::to_borrowed_value(buf)?;
+    match json {
+        Value::Object(mut obj) => {
+            for (key, value) in obj.drain() {
+                deep_flaten_json(key.into_owned(), value, &mut result);
+            }
+        }
+        _ => panic!("Invalid json object traversal."),
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
