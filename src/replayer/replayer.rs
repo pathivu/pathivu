@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 use crate::config::config::Config;
+use crate::json_parser::parser::flatten_json;
 use crate::replayer::iterator::Iterator;
 use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::{
-    PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL, SEGMENT_PREFIX,
+    PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL, SEGEMENT_JSON_KEY_PREFIX,
+    SEGMENT_PREFIX,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
 use failure::Error;
 use fst::SetBuilder;
+use log::warn;
 use rmp_serde::{Deserializer, Serializer};
 use rust_stemmers::{Algorithm, Stemmer};
 use serde::{Deserialize, Serialize};
@@ -129,6 +132,7 @@ impl<'a, S: Store> Replayer<'a, S> {
             .open(&segment_path)?;
         let mut entry_offsets: Vec<u8> = Vec::new();
         let mut posting_list: HashMap<String, Vec<u8>> = HashMap::new();
+        let mut json_key_posting_list: HashMap<String, Vec<u8>> = HashMap::new();
         let mut indices = Vec::new();
         match Iterator::new(&file) {
             Ok(mut itr) => {
@@ -137,7 +141,7 @@ impl<'a, S: Store> Replayer<'a, S> {
                 loop {
                     let item = itr.next()?;
                     match item {
-                        Some(entry) => {
+                        Some(mut entry) => {
                             // set start timestamp and end timestamp.
                             if entry.ts > end_ts {
                                 end_ts = entry.ts;
@@ -145,27 +149,56 @@ impl<'a, S: Store> Replayer<'a, S> {
                             if start_ts == 0 {
                                 start_ts = entry.ts;
                             }
-                            let line = String::from_utf8(entry.line.clone()).unwrap();
-                            let splits = line.split(" ");
                             let mut offset_buf = [0u8; mem::size_of::<u64>()];
                             offset_buf
                                 .as_mut()
                                 .write_u64::<LittleEndian>(itr.valid_entry_offset())
                                 .unwrap();
                             entry_offsets.extend(offset_buf.clone().to_vec());
-                            for split in splits {
-                                if self.stops.contains(&split) {
-                                    continue;
+                            let mut build_index_posting_list = |line: String| {
+                                let splits = line.split(" ");
+                                for split in splits {
+                                    if self.stops.contains(&split) {
+                                        continue;
+                                    }
+                                    let term = self.stemmer.stem(&split);
+                                    let term = String::from(term);
+                                    if let Some(posting_list) = posting_list.get_mut(&term) {
+                                        posting_list.extend(offset_buf.to_vec().iter());
+                                    } else {
+                                        posting_list.insert(term.clone(), offset_buf.to_vec());
+                                    }
+                                    indices.push(term);
                                 }
-                                let term = self.stemmer.stem(&split);
-                                let term = String::from(term);
-                                if let Some(posting_list) = posting_list.get_mut(&term) {
-                                    posting_list.extend(offset_buf.to_vec().iter());
-                                } else {
-                                    posting_list.insert(term.clone(), offset_buf.to_vec());
-                                }
-                                indices.push(term);
+                            };
+                            if entry.structured == 0 {
+                                let line = String::from_utf8(entry.line.clone()).unwrap();
+                                build_index_posting_list(line);
+                                continue;
                             }
+                            flatten_json(&mut entry.line).map_or_else(
+                                |e| {
+                                    warn!("unable to flatten json {}", e);
+                                },
+                                |mut flattened_json| {
+                                    // Rebuild index for the flattened json.
+                                    for (json_key, indexes) in flattened_json.drain() {
+                                        // Build posting list for json key.
+                                        if let Some(posting_list) =
+                                            json_key_posting_list.get_mut(&json_key)
+                                        {
+                                            posting_list.extend(offset_buf.to_vec().iter());
+                                        } else {
+                                            json_key_posting_list
+                                                .insert(json_key, offset_buf.to_vec());
+                                        }
+                                        // Build posting list for index.
+                                        for index in indexes {
+                                            build_index_posting_list(index);
+                                        }
+                                    }
+                                },
+                            );
                         }
                         None => {
                             if entry_offsets.len() == 0 {
@@ -181,6 +214,18 @@ impl<'a, S: Store> Replayer<'a, S> {
                                     format!(
                                         "{}_{}_{}_{}",
                                         SEGMENT_PREFIX, partition, segment_id, &index
+                                    )
+                                    .into_bytes(),
+                                    list,
+                                )
+                                .unwrap();
+                            }
+
+                            for (index, list) in json_key_posting_list {
+                                wb.set(
+                                    format!(
+                                        "{}_{}_{}_{}",
+                                        SEGEMENT_JSON_KEY_PREFIX, partition, segment_id, &index
                                     )
                                     .into_bytes(),
                                     list,
@@ -281,6 +326,7 @@ impl<'a, S: Store> Replayer<'a, S> {
 pub mod tests {
     use super::*;
     use crate::config::config::Config;
+    use crate::parser::parser::Selection;
     use crate::partition::segment_iterator::SegmentIterator;
     use crate::partition::segment_writer::tests::{get_test_cfg, get_test_store};
     use crate::partition::segment_writer::SegmentWriter;
@@ -429,6 +475,65 @@ pub mod tests {
         )
         .unwrap();
         // since two bytes are truncated only one entry will be there.
+        assert_eq!(iterator.entries.len(), 1);
+    }
+
+    #[test]
+    fn test_structured_logs() {
+        let cfg = get_test_cfg();
+        let store = get_test_store(cfg.clone()).clone();
+
+        // create segment and just write don't close to avoid
+        // fst flush.
+        let mut segment_writer = SegmentWriter::new(
+            cfg.clone(),
+            String::from("tmppartition"),
+            1,
+            store.clone(),
+            2,
+        )
+        .unwrap();
+        let mut lines = Vec::new();
+        lines.push(PushLogLine {
+            raw_data: String::from("{\"name\":\"navin\"}").into_bytes(),
+            indexes: vec![],
+            ts: 2,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+        lines.push(PushLogLine {
+            raw_data: String::from("{\"name\":\"schoolboy\"}").into_bytes(),
+            indexes: vec![],
+            ts: 4,
+            structured: true,
+            json_keys: Vec::default(),
+        });
+        segment_writer.push(lines).unwrap();
+        segment_writer.flush().unwrap();
+
+        // drop the writer so that segment file
+        // will be closed.
+        drop(segment_writer);
+        let mut replayer = Replayer::new(cfg.clone(), store.clone());
+        replayer.replay().unwrap();
+
+        // Let's open a segment iterator anc check.
+        let partition_path = Path::new(&cfg.dir).join("partition");
+        let mut iterator = SegmentIterator::new(
+            1,
+            partition_path.clone().join("tmppartition"),
+            store.clone(),
+            Some(Selection {
+                attr: Some(String::from("name")),
+                value: String::from("schoolboy"),
+                structured: true,
+            }),
+            String::from("tmppartition"),
+            1,
+            5,
+            false,
+        )
+        .unwrap();
         assert_eq!(iterator.entries.len(), 1);
     }
 }

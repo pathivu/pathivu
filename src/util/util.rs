@@ -39,6 +39,7 @@ pub fn convert_static_node_to_string(val: StaticNode) -> Option<String> {
         StaticNode::I64(num) => Some(format!("{}", num)),
         StaticNode::U64(num) => Some(format!("{}", num)),
         StaticNode::F64(num) => Some(format!("{}", num)),
-        _ => None,
+        StaticNode::Bool(val) => Some(format!("{}", val)),
+        StaticNode::Null => Some(format!("null")),
     }
 }
