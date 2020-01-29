@@ -27,7 +27,7 @@ use futures::channel::oneshot;
 use futures::executor::block_on;
 use gotham;
 use gotham::error::Result as GothamResult;
-use gotham::handler::{Handler, HandlerFuture, IntoHandlerError, IntoResponse, NewHandler};
+use gotham::handler::{Handler, HandlerFuture, IntoResponse, NewHandler};
 use gotham::helpers::http::response::create_response;
 use gotham::router::builder::*;
 use gotham::state::{FromState, State};
@@ -253,7 +253,7 @@ impl Handler for QueryHandler {
                             Ok(res) => {
                                 let res = create_response(
                                     &state,
-                                    StatusCode::CREATED,
+                                    StatusCode::OK,
                                     mime::APPLICATION_JSON,
                                     res,
                                 );
@@ -261,7 +261,6 @@ impl Handler for QueryHandler {
                                 return oldfuture::future::ok((state, res));
                             }
                             Err(e) => {
-                                println!("{:?}", e);
                                 let res = create_response(
                                     &state,
                                     StatusCode::NOT_ACCEPTABLE,
@@ -271,7 +270,15 @@ impl Handler for QueryHandler {
                                 return oldfuture::future::ok((state, res));
                             }
                         },
-                        Err(e) => return oldfuture::future::err((state, e.into_handler_error())),
+                        Err(e) => {
+                            let res = create_response(
+                                &state,
+                                StatusCode::NOT_ACCEPTABLE,
+                                mime::TEXT_PLAIN,
+                                format!("{}", e),
+                            );
+                            return oldfuture::future::ok((state, res));
+                        }
                     }
                 }
                 Err(e) => {
@@ -332,8 +339,7 @@ impl Handler for PartitionHandler {
         match self.partitions() {
             Ok(res) => {
                 let body = serde_json::to_string(&res).expect("Failed to serialise to json");
-                let res =
-                    create_response(&state, StatusCode::CREATED, mime::APPLICATION_JSON, body);
+                let res = create_response(&state, StatusCode::OK, mime::APPLICATION_JSON, body);
                 return Box::new(oldfuture::future::ok((state, res)));
             }
             Err(e) => {
