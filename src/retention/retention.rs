@@ -100,6 +100,10 @@ impl<S: Store> CronJob for RententionManager<S> {
                     continue;
                 }
                 let now = now.unwrap();
+                if now.as_secs() < segment_file.end_ts {
+                    // TODO: we need to enforce time has to be incremental.
+                    continue;
+                }
                 let diff = now.as_secs() - segment_file.end_ts;
                 if diff > self.cfg.retention_period {
                     // Delete this segement file.

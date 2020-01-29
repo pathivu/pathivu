@@ -60,7 +60,16 @@ impl api::server::Pathivu for PathivuGrpcServer {
         req: Request<api::QueryRequest>,
     ) -> Result<TonicResponse<Self::TailStream>, Status> {
         let (tx, rx) = mpsc::channel(100);
-        let req = req.into_inner();
+        let mut req = req.into_inner();
+        if req.partitions.len() == 0 {
+            let partitions = get_partitions(&self.partition_path);
+            match partitions {
+                Ok(partitions) => req.partitions = partitions,
+                Err(e) => {
+                    return Err(Status::new(Code::Internal, format!("{}", e)));
+                }
+            }
+        }
         let mut ingester_transport = self.ingester_manager.clone();
         if let Err(e) = ingester_transport.register_tailer(req.partitions, tx) {
             return Err(Status::new(Code::Internal, format!("{}", e)));
