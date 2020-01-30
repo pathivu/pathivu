@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 use crate::store::batch::Batch;
-/// MergeOperator copied from sled. rocksdb also support, so it can used along with the rocksdb
-pub type MergeOperator =
-    fn(key: &[u8], last_value: Option<&[u8]>, new_merge: &[u8]) -> Option<Vec<u8>>;
-
 pub trait Store {
     fn merge(&mut self, key: &[u8], value: Vec<u8>);
     fn set(&mut self, key: &[u8], value: Vec<u8>);

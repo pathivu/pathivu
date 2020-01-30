@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use crate::partition::iterator::Iterator;
 use crate::partition::partition_iterator::PartitionIterator;
 use crate::partition::segment_iterator::Entry;
-use crate::store::batch::Batch;
 use crate::store::store::Store;
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -18,31 +18,24 @@ use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types;
 use crate::types::types::{
-    LogLine, PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL,
-    SEGEMENT_JSON_KEY_PREFIX, SEGMENT_PREFIX, STRUCTURED_DATA, UN_STRUCTURED_DATA,
+    PartitionRegistry, SegmentFile, PARTITION_PREFIX, POSTING_LIST_ALL, SEGEMENT_JSON_KEY_PREFIX,
+    SEGMENT_PREFIX, STRUCTURED_DATA, UN_STRUCTURED_DATA,
 };
 use byteorder::{LittleEndian, WriteBytesExt};
-use failure::{bail, Error};
-use fst::raw::Builder;
-use fst::{IntoStreamer, Map, SetBuilder, Streamer};
+use failure::Error;
+use fst::SetBuilder;
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, File};
-use std::io::{BufWriter, IoSlice, Write};
+use std::io::{IoSlice, Write};
 use std::mem;
 use std::path::Path;
-use std::time::Duration;
 const MAGIC_TEXT: &str = "Chola!Header!";
 const MAGIC_NUMBER: u8 = 1;
-use crate::partition::segment_iterator::Entry;
-use binary_heap_plus::BinaryHeap;
-use binary_heap_plus::MinComparator;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
 /// SegmentWriter is used to write segment files.
-type Index = String;
 
 pub struct SegmentWriter<S> {
     pub partition: String,
@@ -54,7 +47,6 @@ pub struct SegmentWriter<S> {
     id: u64,
     start_ts: u64,
     end_ts: u64,
-    batch_count: usize,
     index_posting_list: HashMap<String, Vec<u8>>,
     json_key_posting_list: HashMap<String, Vec<u8>>,
     index_size: usize,
@@ -96,7 +88,6 @@ impl<S: Store> SegmentWriter<S> {
             id: id,
             start_ts: start_ts,
             end_ts: start_ts,
-            batch_count: 0,
             index_posting_list: HashMap::default(),
             json_key_posting_list: HashMap::default(),
             index_size: 0,
@@ -131,12 +122,16 @@ impl<S: Store> SegmentWriter<S> {
             let mut line_offset = [0u8; mem::size_of::<u64>()];
             line_offset
                 .as_mut()
-                .write_u64::<LittleEndian>(self.file_offset);
+                .write_u64::<LittleEndian>(self.file_offset)
+                .unwrap();
             // Encode log line.
             let line_buf = log_line.raw_data;
             // Encode time stamp.
             let mut ts_buf = [0u8; mem::size_of::<u64>()];
-            ts_buf.as_mut().write_u64::<LittleEndian>(log_line.ts);
+            ts_buf
+                .as_mut()
+                .write_u64::<LittleEndian>(log_line.ts)
+                .unwrap();
             let indexes = log_line.indexes.drain(0..log_line.indexes.len());
             // we'll track of all the offsets because If no search given, we should give
             // all the lines.
@@ -166,7 +161,10 @@ impl<S: Store> SegmentWriter<S> {
             self.file_offset = self.file_offset + entry_length + 8;
             // encode entry length.
             let mut len_buf = [0u8; mem::size_of::<u64>()];
-            len_buf.as_mut().write_u64::<LittleEndian>(entry_length);
+            len_buf
+                .as_mut()
+                .write_u64::<LittleEndian>(entry_length)
+                .unwrap();
             buf.push(len_buf.to_vec());
             buf.push(ts_buf.to_vec());
             // If it is json set the 1 otherwise set 0.
@@ -197,11 +195,6 @@ impl<S: Store> SegmentWriter<S> {
     /// size of the segment file.
     pub fn size(&self) -> u64 {
         self.file_offset
-    }
-
-    /// index_size returns size of index file.
-    pub fn index_size(&self) -> usize {
-        self.index_size
     }
 
     /// close will flush all the remaining batched line.
@@ -301,25 +294,9 @@ impl<S: Store> SegmentWriter<S> {
         Ok(())
     }
 
-    pub fn file_id(&self) -> u64 {
-        self.id
-    }
-
     /// segment_ts givens start ts and end ts of the segment
     pub fn segment_ts(&self) -> (u64, u64) {
         (self.start_ts, self.end_ts)
-    }
-
-    pub fn get_inmemory_hint(
-        &self,
-        query: String,
-        start_ts: u64,
-        end_ts: u64,
-    ) -> Option<Vec<Entry>> {
-        if self.end_ts > start_ts {
-            return None;
-        }
-        return None;
     }
 }
 
@@ -332,9 +309,7 @@ pub mod tests {
     use crate::partition::segment_iterator::SegmentIterator;
     use crate::store::rocks_store::RocksStore;
     use crate::types::types::api::PushLogLine;
-    use crate::types::types::LogLine;
     use std::path::Path;
-    use std::time::Duration;
     use tempfile;
     pub fn get_test_cfg() -> Config {
         let tmp_dir = tempfile::tempdir().unwrap();
@@ -386,7 +361,7 @@ pub mod tests {
             structured: false,
             json_keys: Vec::new(),
         });
-        segment_writer.push(lines);
+        segment_writer.push(lines).unwrap();
         // check the end ts.
         assert_eq!(segment_writer.end_ts, 4);
         // check all the entry offset.

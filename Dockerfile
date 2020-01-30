@@ -1,5 +1,5 @@
 FROM frolvlad/alpine-glibc
 
-COPY target/release/chola /bin/chola
+COPY target/release/pathivu /bin/pathivu
 
-CMD ["bin/chola"]
+CMD ["bin/pathivu"]

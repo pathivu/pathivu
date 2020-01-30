@@ -16,7 +16,7 @@
 use crate::util::util::convert_static_node_to_string;
 use failure::Error;
 use simd_json;
-use simd_json::value::borrowed::{Object, Value};
+use simd_json::value::borrowed::Value;
 use std::collections::{HashMap, VecDeque};
 /// get_value_from_json is used to get value of the given json from the flattened key.
 pub fn get_value_from_json(key: String, json: &mut [u8]) -> Result<Option<Value>, Error> {

@@ -15,7 +15,7 @@
  */
 use crate::partition::segment_iterator::{decode_entry, Entry};
 use crate::util::decode_u64;
-use failure::bail;
+use failure::format_err;
 use failure::Error;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -34,7 +34,7 @@ impl<'a> Iterator<'a> {
         let info = fs.metadata()?;
         if info.len() < 14 {
             // layout itself not generated so, let's delete the file.
-            return bail!("invalid segment file");
+            return Err(format_err!("invalid segment file"));
         }
         fs.seek(SeekFrom::Start(14))?;
         Ok(Iterator {
