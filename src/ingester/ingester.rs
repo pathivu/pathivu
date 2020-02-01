@@ -15,7 +15,6 @@
  */
 use crate::config::config::Config;
 use crate::partition::segment_writer::SegmentWriter;
-use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::*;
 use futures::channel::mpsc::{Receiver, Sender};
@@ -24,8 +23,8 @@ use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 use log::{debug, info, warn};
 use retain_mut::RetainMut;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
+use rmp_serde::Deserializer;
+use serde::Deserialize;
 use std::collections::HashMap;
 use tonic::Status;
 

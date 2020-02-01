@@ -36,17 +36,13 @@ pub struct Entry {
 }
 
 // SegmentIterator is used to iterate over segment files.
-pub struct SegmentIterator<S> {
-    store: S,
+pub struct SegmentIterator {
     pub entries: Vec<Rc<Entry>>,
-    id: u64,
     pub current_index: usize,
-    nothing_track: bool,
-    partition: String,
 }
 
-impl<S: Store> SegmentIterator<S> {
-    pub fn new(
+impl SegmentIterator {
+    pub fn new<S: Store>(
         id: u64,
         partition_path: path::PathBuf,
         store: S,
@@ -55,7 +51,7 @@ impl<S: Store> SegmentIterator<S> {
         start_ts: u64,
         end_ts: u64,
         backward: bool,
-    ) -> Result<SegmentIterator<S>, failure::Error> {
+    ) -> Result<SegmentIterator, failure::Error> {
         // let collect all the posting list for the given indices.
         let mut entry_indices = Vec::new();
 
@@ -173,17 +169,13 @@ impl<S: Store> SegmentIterator<S> {
             entries.reverse();
         }
         Ok(SegmentIterator {
-            store: store,
             entries: entries,
-            id: id,
             current_index: 0,
-            nothing_track: true,
-            partition: partition,
         })
     }
 }
 
-impl<S: Store> Iterator for SegmentIterator<S> {
+impl Iterator for SegmentIterator {
     /// entry gives the iterators current entry.
     fn entry(&self) -> Option<Rc<Entry>> {
         let entry = self.entries.get(self.current_index);

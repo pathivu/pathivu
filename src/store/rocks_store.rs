@@ -17,8 +17,7 @@ use crate::config::config::Config;
 use crate::store::batch::Batch as StoreBatch;
 use crate::store::store::Store;
 use failure;
-use failure::bail;
-use log::{debug, info, warn};
+use failure::format_err;
 use rocksdb::{Writable, WriteBatch, DB};
 use std::sync::Arc;
 pub struct RocksStore {
@@ -34,18 +33,18 @@ impl RocksStore {
 
 impl Store for RocksStore {
     fn merge(&mut self, key: &[u8], value: Vec<u8>) {
-        self.db.merge(key, &value);
+        self.db.merge(key, &value).unwrap();
     }
 
     fn flush(&mut self) -> Result<usize, failure::Error> {
         match self.db.flush(false) {
-            Ok(size) => Ok(0),
-            Err(e) => bail!("{}", e),
+            Ok(_) => Ok(0),
+            Err(e) => Err(format_err!("{}", e)),
         }
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) {
-        self.db.put(key, &value);
+        self.db.put(key, &value).unwrap();
     }
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
@@ -54,7 +53,7 @@ impl Store for RocksStore {
                 Some(val) => Ok(Some(val.to_vec())),
                 None => Ok(None),
             },
-            Err(e) => bail!("{}", e),
+            Err(e) => Err(format_err!("{}", e)),
         }
     }
     fn flush_batch(&self, wb: StoreBatch) -> Result<(), failure::Error> {

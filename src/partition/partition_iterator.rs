@@ -18,13 +18,11 @@ use crate::parser::parser::Selection;
 use crate::partition::iterator::Iterator;
 use crate::partition::segment_iterator::Entry;
 use crate::partition::segment_iterator::SegmentIterator;
-use crate::store::batch::Batch;
 use crate::store::store::Store;
 use crate::types::types::{PartitionRegistry, SegmentFile, PARTITION_PREFIX};
 use failure;
-use rmp_serde::{Deserializer, Serializer};
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use rmp_serde::Deserializer;
+use serde::Deserialize;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -34,7 +32,7 @@ pub struct PartitionIterator<S> {
     store: S,
     current_segment: usize,
     segment_files: Vec<SegmentFile>,
-    current_iterator: Option<SegmentIterator<S>>,
+    current_iterator: Option<SegmentIterator>,
     cfg: Config,
     partition: String,
     selection: Option<Selection>,
@@ -176,9 +174,7 @@ pub mod tests {
     use crate::partition::segment_writer::tests::{get_test_cfg, get_test_store};
     use crate::partition::segment_writer::SegmentWriter;
     use crate::store::rocks_store::RocksStore;
-    use crate::store::store::Store;
     use crate::types::types::api::PushLogLine;
-    use crate::types::types::{LogLine, PartitionRegistry, PARTITION_PREFIX};
     pub fn create_segment(
         id: u64,
         partition: String,
@@ -229,14 +225,14 @@ pub mod tests {
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);
-        partition_iterator.next();
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 4);
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 6);
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 7);
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 9);
         let valid = partition_iterator.next().unwrap();
         assert!(valid.is_none());
@@ -257,14 +253,14 @@ pub mod tests {
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 9);
-        partition_iterator.next();
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 6);
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 4);
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 3);
-        partition_iterator.next();
+        partition_iterator.next().unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);
         let valid = partition_iterator.next().unwrap();
         assert!(valid.is_none());

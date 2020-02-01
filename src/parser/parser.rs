@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use pest;
-use pest::Parser;
-#[macro_use]
-use pest_derive::Parser;
 use failure::format_err;
 use failure::Error;
+use pest;
 use pest::iterators::Pair;
+use pest::Parser;
+use pest_derive::Parser;
 #[derive(Parser)]
 #[grammar = "parser/query.pest"]
 struct QueryParser;

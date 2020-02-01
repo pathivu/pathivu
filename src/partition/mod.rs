@@ -16,6 +16,6 @@
 pub mod iterator;
 pub mod partition_iterator;
 pub mod posting_list;
-pub mod segment_file_iterator;
+//pub mod segment_file_iterator;
 pub mod segment_iterator;
 pub mod segment_writer;

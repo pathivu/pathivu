@@ -22,28 +22,20 @@ use crate::partition::partition_iterator::PartitionIterator;
 use crate::partition::segment_iterator::Entry;
 use crate::server::server::PartitionHandler;
 use crate::store::store::Store;
-use crate::types::types::{IngesterFlushHintReq, IngesterRequest, STRUCTURED_DATA};
-use crate::types::types::{QueryRequest, QueryResponse, ResLine};
+use crate::types::types::ResLine;
+use crate::types::types::{IngesterFlushHintReq, STRUCTURED_DATA};
 use crate::util::util::{
     convert_static_node_to_f32, convert_static_node_to_string, convert_string_to_f32,
 };
 use failure::format_err;
-use futures::channel::mpsc::Sender;
 use futures::channel::oneshot;
 use futures::executor::block_on;
-use futures::sink::SinkExt;
-use log::{debug, info, warn};
+use log::warn;
 use serde_json::json;
 use simd_json::value::borrowed::Value;
-use simd_json::value::tape::StaticNode;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-/// DistinctRes gives the distinct value and count of the distinct value.
-struct DistinctRes {
-    distinct_count: HashMap<String, u64>,
-    show_count: bool,
-}
 
 pub struct QueryExecutor<S: Store + Clone> {
     store: S,
@@ -401,7 +393,7 @@ impl<S: Store + Clone> QueryExecutor<S> {
         &self,
         itr: &mut MergeIteartor<S>,
         average: &parser::Average,
-    ) -> Result<(HashMap<String, f32>), failure::Error> {
+    ) -> Result<HashMap<String, f32>, failure::Error> {
         let key_for_average_lookup = &average.attr;
         let group_by = average.by.as_ref();
 
@@ -528,7 +520,6 @@ pub mod tests {
     use crate::config::config::Config;
     use crate::ingester::manager::Manager;
     use crate::iterator::merge_iterator::MergeIteartor;
-    use crate::parser::*;
     use crate::partition::partition_iterator::PartitionIterator;
     use crate::partition::segment_writer::tests::{get_test_cfg, get_test_store};
     use crate::partition::segment_writer::SegmentWriter;
