@@ -1,5 +1,5 @@
 cargo build --release
 
-docker build -t schoolboy/chola-nightly .
+docker build -t schoolboy/pathivu .
 
-docker push schoolboy/chola-nightly
+docker push schoolboy/pathivu

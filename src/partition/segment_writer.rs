@@ -314,7 +314,7 @@ pub mod tests {
     pub fn get_test_cfg() -> Config {
         let tmp_dir = tempfile::tempdir().unwrap();
         Config {
-            dir: tmp_dir.path().to_str().unwrap().to_string(),
+            dir: tmp_dir.path().to_path_buf(),
             max_segment_size: 100 << 10,
             max_index_size: 100 << 10,
             max_batch_size: 1,
