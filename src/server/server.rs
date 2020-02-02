@@ -40,7 +40,7 @@ use oldfuture::stream::Stream;
 use std::fs;
 use std::fs::create_dir_all;
 use std::panic::RefUnwindSafe;
-use std::path::Path;
+use std::path::PathBuf;
 use std::thread;
 use tokio::runtime::Runtime;
 use tonic;
@@ -48,7 +48,7 @@ use tonic::{transport::Server as TonicServer, Code, Request, Response as TonicRe
 struct PathivuGrpcServer {
     ingester_manager: Manager,
     query_executor: QueryExecutor<rocks_store::RocksStore>,
-    partition_path: String,
+    partition_path: PathBuf,
 }
 
 #[tonic::async_trait]
@@ -313,13 +313,13 @@ impl Clone for QueryHandler {
 
 #[derive(Clone)]
 pub struct PartitionHandler {
-    pub partition_path: String,
+    pub partition_path: PathBuf,
 }
 
 /// get_partitions returns partitions list that has been ingesterd into
 /// pathivu.
-pub fn get_partitions(path: &String) -> Result<Vec<String>, failure::Error> {
-    let path = Path::new(path).join("partition");
+pub fn get_partitions(path: &PathBuf) -> Result<Vec<String>, failure::Error> {
+    let path = path.join("partition");
     create_dir_all(&path)?;
     let mut partitions = Vec::new();
     let dir = fs::read_dir(&path)?;
@@ -424,7 +424,7 @@ impl Server {
                 .post("/query")
                 .to_new_handler(QueryHandler { executor: executor });
             route.get("/partitions").to_new_handler(PartitionHandler {
-                partition_path: cfg.dir,
+                partition_path: cfg.dir.clone(),
             })
         });
         gotham::start(addr, router);

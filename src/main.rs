@@ -32,7 +32,10 @@ use std::time::Duration;
 mod retention;
 mod types;
 mod util;
+use clap::{App, Arg};
 use simplelog::*;
+use std::fs::create_dir_all;
+use std::path::Path;
 fn main() {
     // CombinedLogger::init(vec![
     //     TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed).unwrap(),
@@ -40,12 +43,39 @@ fn main() {
     //     TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Mixed).unwrap(),
     // ])
     // .unwrap();
+    let matches = App::new("pathivu")
+        .version("v0.1")
+        .about("Pathivu: Logs you can search")
+        .arg(
+            Arg::with_name("dir")
+                .short("d")
+                .long("dir")
+                .value_name("DIR")
+                .help("directory to store logs")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("retension")
+                .short("r")
+                .long("ret")
+                .help("log retention in days")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    let root_dir = Path::new(matches.value_of("dir").unwrap_or(".")).join("pathivu_data");
+    create_dir_all(&root_dir).unwrap();
+    let days_to_keep = matches
+        .value_of("retension")
+        .unwrap_or("10")
+        .parse::<u64>()
+        .expect("argument retension should be in number");
     let cfg = config::config::Config {
-        dir: "/home/schoolboy/cholalog".to_string(),
+        dir: root_dir,
         max_segment_size: 100 << 10,
         max_index_size: 100 << 10,
         max_batch_size: 20,
-        retention_period: 864000,
+        retention_period: days_to_keep * 26 * 60 * 60,
     };
     let store = store::rocks_store::RocksStore::new(cfg.clone()).unwrap();
 
