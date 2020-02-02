@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use std::path::PathBuf;
 /// Config for pathivu.
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub dir: String,
+    pub dir: PathBuf,
     pub max_segment_size: u64,
     pub max_batch_size: u8,
     pub max_index_size: usize,

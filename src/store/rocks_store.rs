@@ -26,7 +26,7 @@ pub struct RocksStore {
 
 impl RocksStore {
     pub fn new(cfg: Config) -> Result<RocksStore, failure::Error> {
-        let db = DB::open_default(&cfg.dir).unwrap();
+        let db = DB::open_default(&cfg.dir.join("store").to_str().unwrap()).unwrap();
         Ok(RocksStore { db: Arc::new(db) })
     }
 }
