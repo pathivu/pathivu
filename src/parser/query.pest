@@ -40,5 +40,6 @@ distinct_count = {"distinct_count("~flattend_key~") as "~variable}
 average = {("avg("~flattend_key+~") as "~variable+ ~ " by " ~ flattend_key) | ("avg("~flattend_key+~") as "~variable)}
 number = {DECIMAL_NUMBER+}
 limit = {"limit "~ number}
-query_block = {source | count | distinct|distinct_count|average | limit| unstructured | structured}
+distance = {"distance "~number}
+query_block = {source | count | distinct|distinct_count|average | limit|distance| unstructured | structured}
 query = { (query_block ~ " | " ~query ~EOI) | (query_block ~ EOI) }

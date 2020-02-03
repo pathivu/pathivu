@@ -119,6 +119,7 @@ mod tests {
             1,
             9,
             None,
+            0,
             store.clone(),
             cfg.clone(),
             false,
@@ -130,7 +131,7 @@ mod tests {
         create_segment(1, partition_name.clone(), cfg.clone(), 10, store.clone());
         create_segment(2, partition_name.clone(), cfg.clone(), 14, store.clone());
         let partition_iterator =
-            PartitionIterator::new(partition_name, 10, 19, None, store, cfg, false)
+            PartitionIterator::new(partition_name, 10, 19, None, 0, store, cfg, false)
                 .unwrap()
                 .unwrap();
         itrs.push(Rc::new(RefCell::new(partition_iterator)));
@@ -163,6 +164,7 @@ mod tests {
             1,
             9,
             None,
+            0,
             store.clone(),
             cfg.clone(),
             false,
@@ -174,7 +176,7 @@ mod tests {
         create_segment(1, partition_name.clone(), cfg.clone(), 2, store.clone());
         create_segment(2, partition_name.clone(), cfg.clone(), 6, store.clone());
         let partition_iterator =
-            PartitionIterator::new(partition_name, 1, 10, None, store, cfg, false)
+            PartitionIterator::new(partition_name, 1, 10, None, 0, store, cfg, false)
                 .unwrap()
                 .unwrap();
         itrs.push(Rc::new(RefCell::new(partition_iterator)));
@@ -198,16 +200,24 @@ mod tests {
         let partition_name = String::from("temppartition");
         create_segment(1, partition_name.clone(), cfg.clone(), 1, store.clone());
         create_segment(2, partition_name.clone(), cfg.clone(), 5, store.clone());
-        let partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, None, store.clone(), cfg.clone(), true)
-                .unwrap()
-                .unwrap();
+        let partition_iterator = PartitionIterator::new(
+            partition_name,
+            1,
+            9,
+            None,
+            0,
+            store.clone(),
+            cfg.clone(),
+            true,
+        )
+        .unwrap()
+        .unwrap();
         itrs.push(Rc::new(RefCell::new(partition_iterator)));
         let partition_name = String::from("temppartition1");
         create_segment(1, partition_name.clone(), cfg.clone(), 2, store.clone());
         create_segment(2, partition_name.clone(), cfg.clone(), 6, store.clone());
         let partition_iterator =
-            PartitionIterator::new(partition_name, 1, 10, None, store, cfg, true)
+            PartitionIterator::new(partition_name, 1, 10, None, 0, store, cfg, true)
                 .unwrap()
                 .unwrap();
         itrs.push(Rc::new(RefCell::new(partition_iterator)));

@@ -39,6 +39,7 @@ pub struct PartitionIterator<S> {
     start_ts: u64,
     end_ts: u64,
     backward: bool,
+    distance: u32,
 }
 
 impl<S: Store + Clone> PartitionIterator<S> {
@@ -48,6 +49,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
         start_ts: u64,
         end_ts: u64,
         selection: Option<Selection>,
+        distance: u32,
         store: S,
         cfg: Config,
         backward: bool,
@@ -88,6 +90,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
                 store.clone(),
                 selection.clone(),
                 partition.clone(),
+                distance,
                 start_ts,
                 end_ts,
                 backward,
@@ -105,6 +108,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             start_ts: start_ts,
             end_ts: end_ts,
             backward: backward,
+            distance: distance,
         }))
     }
 
@@ -150,6 +154,7 @@ impl<S: Store + Clone> PartitionIterator<S> {
             self.store.clone(),
             self.selection.clone(),
             self.partition.clone(),
+            self.distance,
             self.start_ts,
             self.end_ts,
             self.backward,
@@ -221,7 +226,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, None, store, cfg, false)
+            PartitionIterator::new(partition_name, 1, 9, None, 0, store, cfg, false)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 1);
@@ -249,7 +254,7 @@ pub mod tests {
         create_segment(3, partition_name.clone(), cfg.clone(), 7, store.clone());
         create_segment(4, partition_name.clone(), cfg.clone(), 10, store.clone());
         let mut partition_iterator =
-            PartitionIterator::new(partition_name, 1, 9, None, store, cfg, true)
+            PartitionIterator::new(partition_name, 1, 9, None, 0, store, cfg, true)
                 .unwrap()
                 .unwrap();
         assert_eq!(partition_iterator.entry().unwrap().ts, 9);
