@@ -48,6 +48,7 @@ impl SegmentIterator {
         store: S,
         selection: Option<Selection>,
         partition: String,
+        distance: u32,
         start_ts: u64,
         end_ts: u64,
         backward: bool,
@@ -88,7 +89,7 @@ impl SegmentIterator {
                 }?;
                 // TODO: doing fuzzy query now. But in future, it should be configurable.
                 // TODO: don't do value indices search on structured query with zero key indices.
-                let fuzzy_query = Levenshtein::new(&selection.value, 2)?;
+                let fuzzy_query = Levenshtein::new(&selection.value, distance)?;
                 let indices_stream = index_set.search(fuzzy_query).into_stream().into_strs()?;
                 // get all the posting list for the given indices.
                 let mut value_indices = Vec::new();

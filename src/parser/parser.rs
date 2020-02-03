@@ -69,6 +69,7 @@ pub struct Query {
     pub average: Option<Average>,
     pub soruces: Vec<String>,
     pub limit: u64,
+    pub distance: u32,
 }
 
 impl Query {
@@ -171,6 +172,12 @@ pub fn parse_query(pair: Pair<'_, Rule>, mut query: &mut Query) -> Result<(), Er
                 }
                 parse_source(inner, &mut query);
             }
+            Rule::distance => {
+                if query.distance != 0 {
+                    return Err(format_err!("Only one distance limit is allowed"));
+                }
+                parse_distance(inner, &mut query);
+            }
             _ => {}
         }
     }
@@ -182,6 +189,11 @@ pub fn parse_query(pair: Pair<'_, Rule>, mut query: &mut Query) -> Result<(), Er
     Ok(())
 }
 
+/// parse_fuzzy will parse the fuzzy distance limit
+fn parse_distance(pair: Pair<'_, Rule>, query: &mut Query) {
+    let limit = pair.into_inner().next().unwrap().as_str();
+    query.distance = limit.parse().unwrap();
+}
 /// parse_unstructured will parse the unstructed selection statement.
 fn parse_unstructured(pair: Pair<'_, Rule>, query: &mut Query) {
     let mut inner = pair.into_inner();
@@ -361,5 +373,10 @@ pub mod tests {
         assert_eq!(selection.structured, false);
 
         assert_eq!(query.limit, 100);
+    }
+    #[test]
+    fn test_distance() {
+        let query = parse(String::from("distance 100")).unwrap();
+        assert_eq!(query.distance, 100);
     }
 }
