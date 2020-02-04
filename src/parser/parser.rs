@@ -48,7 +48,6 @@ pub struct Count {
 #[derive(Default, Debug)]
 pub struct Distinct {
     pub attr: String,
-    pub alias: String,
     pub count: bool,
 }
 
@@ -214,10 +213,8 @@ fn parse_distinct(pair: Pair<'_, Rule>, query: &mut Query) {
     // parse attribute and alias.
     let mut inner = pair.into_inner();
     let attr = inner.next().unwrap().as_str();
-    let alias = inner.next().unwrap().as_str();
     let mut distinct = Distinct {
         attr: String::from(attr),
-        alias: String::from(alias),
         count: false,
     };
     // Check whether it is distinct count or not.
@@ -335,19 +332,14 @@ pub mod tests {
     #[test]
     fn test_distinct() {
         // basic assertion.
-        let query = parse(String::from("distinct(country) as unique_country")).unwrap();
+        let query = parse(String::from("distinct(country)")).unwrap();
         let distinct = query.distinct.unwrap();
         assert_eq!(distinct.attr, "country");
-        assert_eq!(distinct.alias, "unique_country");
         assert_eq!(distinct.count, false);
         // distinct_count assertion.
-        let query = parse(String::from(
-            "distinct_count(country.hello/world) as unique_country",
-        ))
-        .unwrap();
+        let query = parse(String::from("distinct_count(country.hello/world)")).unwrap();
         let distinct = query.distinct.unwrap();
         assert_eq!(distinct.attr, "country.hello/world");
-        assert_eq!(distinct.alias, "unique_country");
         assert_eq!(distinct.count, true);
     }
 

@@ -669,7 +669,6 @@ pub mod tests {
 
         let distinct = parser::Distinct {
             attr: "skills.language".to_string(),
-            alias: "languages".to_string(),
             count: false,
         };
 

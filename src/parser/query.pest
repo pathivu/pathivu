@@ -26,7 +26,7 @@ structured = {flattend_key+ ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~ string
 source = {"source" ~ SPACE_SEPARATOR* ~ "=" ~ SPACE_SEPARATOR* ~  ((variable ~",")+ ~ variable | variable)}
 count = {("count("~flattend_key~") as "~variable ~" by " ~ flattend_key)| 
  ("count("~flattend_key~") as "~variable)}
-distinct = {"distinct("~flattend_key~") as "~variable}
+distinct = {"distinct("~flattend_key~")"}
 string = ${ "\"" ~ inner ~ "\"" }
 char = {
     !("\"" | "\\") ~ ANY
@@ -36,7 +36,7 @@ char = {
 
 inner = @{ char* }
 variable = {(ASCII_ALPHANUMERIC+ ~"_")+ ~ ASCII_ALPHANUMERIC+ | ASCII_ALPHANUMERIC+}
-distinct_count = {"distinct_count("~flattend_key~") as "~variable}
+distinct_count = {"distinct_count("~flattend_key~")"}
 average = {("avg("~flattend_key+~") as "~variable+ ~ " by " ~ flattend_key) | ("avg("~flattend_key+~") as "~variable)}
 number = {DECIMAL_NUMBER+}
 limit = {"limit "~ number}
