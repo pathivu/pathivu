@@ -113,6 +113,8 @@ var since time.Duration
 
 var partitions []string
 
+var query string
+
 var startTs int64
 
 var endTs int64
@@ -141,12 +143,14 @@ func main() {
 				req.EndTs = uint64(time.Now().Unix())
 			}
 			req.Forward = false
+			req.Query = query
 			res := c.query(req)
 			fmt.Println(string(pretty.Pretty([]byte(res.Json))))
 		},
 	}
 	queryCmd.Flags().DurationVar(&since, "since", time.Second*0, "since=1h")
 	queryCmd.Flags().StringArrayVar(&partitions, "apps", []string{}, "apps=kubeserver")
+	queryCmd.Flags().StringVar(&query, "query", "", `query=error.code="500"`)
 
 	var tailCmd = &cobra.Command{
 		Use:   "tail --apps=kube-server  --apps=api-server",

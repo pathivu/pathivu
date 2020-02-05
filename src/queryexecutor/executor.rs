@@ -66,7 +66,6 @@ impl<S: Store + Clone> QueryExecutor<S> {
         limit: u64,
     ) -> Result<String, failure::Error> {
         let mut query = parser::parse(query)?;
-
         // We'll give more precedence for request limit.
         if limit != 0 {
             query.limit = limit;
