@@ -309,6 +309,21 @@ pub mod tests {
         assert_eq!(selection.value, "kumari kandam");
         assert_eq!(selection.structured, true);
         assert_eq!(selection.attr.unwrap(), "name.location");
+        let query = parse(String::from("name.location= \"kumari kandam\"")).unwrap();
+        let selection = query.selection.unwrap();
+        assert_eq!(selection.value, "kumari kandam");
+        assert_eq!(selection.structured, true);
+        assert_eq!(selection.attr.unwrap(), "name.location");
+        let query = parse(String::from("name.location =\"kumari kandam\"")).unwrap();
+        let selection = query.selection.unwrap();
+        assert_eq!(selection.value, "kumari kandam");
+        assert_eq!(selection.structured, true);
+        assert_eq!(selection.attr.unwrap(), "name.location");
+        let query = parse(String::from("name.location=\"kumari kandam\"")).unwrap();
+        let selection = query.selection.unwrap();
+        assert_eq!(selection.value, "kumari kandam");
+        assert_eq!(selection.structured, true);
+        assert_eq!(selection.attr.unwrap(), "name.location");
     }
     #[test]
     fn test_count() {
