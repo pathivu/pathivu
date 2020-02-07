@@ -82,15 +82,25 @@ impl Query {
 /// parse will parse the given query string into internal
 /// Pathivu query structure.
 pub fn parse(query: String) -> Result<Query, Error> {
-    let mut query_innner = Query::default();
+    let mut query_inner = Query::default();
     // Don't parse empty string
     if query == "" {
-        return Ok(query_innner);
+        return Ok(query_inner);
     }
     let mut result = QueryParser::parse(Rule::query, &query)?;
     let tokens = result.next().unwrap();
-    parse_query(tokens, &mut query_innner)?;
-    Ok(query_innner)
+    parse_query(tokens, &mut query_inner)?;
+    if query_inner.is_aggregation_exist() && query_inner.limit != 0 {
+        return Err(format_err!(
+            "Limit is not supported with aggregation. At least for now"
+        ));
+    }
+
+    // If there is no limit, update the default limit.
+    if query_inner.limit == 0 {
+        query_inner.limit = DEFAULT_LIMIT;
+    }
+    Ok(query_inner)
 }
 
 /// parse_average will parse average group by.
@@ -111,6 +121,7 @@ fn parse_average(pair: Pair<'_, Rule>, mut query: &mut Query) {
     }
     // update the average.
     query.average = Some(average);
+    query.aggregation_exist = true;
 }
 
 /// parse_query is used to parse the Pathivu query into internal
@@ -180,11 +191,6 @@ pub fn parse_query(pair: Pair<'_, Rule>, mut query: &mut Query) -> Result<(), Er
             _ => {}
         }
     }
-
-    // If there is no limit, update the default limit.
-    if query.limit == 0 {
-        query.limit = DEFAULT_LIMIT;
-    }
     Ok(())
 }
 
@@ -243,6 +249,7 @@ fn parse_count(pair: Pair<'_, Rule>, query: &mut Query) {
     }
     // update the count.
     query.count = Some(count);
+    query.aggregation_exist = true;
 }
 
 /// parse_structured is used to parse the structured queries.
@@ -294,6 +301,15 @@ pub mod tests {
         assert_eq!(avg.attr, "weight".to_string());
         assert_eq!(avg.alias, "avg_weight".to_string());
         assert_eq!(avg.by.unwrap(), "hello".to_string());
+    }
+
+    #[test]
+    fn test_average_err() {
+        let err = parse(String::from("avg(weight) as avg_weight | limit 10")).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Limit is not supported with aggregation. At least for now"
+        );
     }
     #[test]
     fn test_selection() {
@@ -367,7 +383,7 @@ pub mod tests {
     #[test]
     fn test_combined() {
         let query = parse(String::from(
-            "limit 100 | message=\"succeed\" | count(country) as num_of_country",
+            "message=\"succeed\" | count(country) as num_of_country",
         ))
         .unwrap();
 
@@ -378,8 +394,6 @@ pub mod tests {
         assert_eq!(selection.attr, None);
         assert_eq!(selection.value, "succeed");
         assert_eq!(selection.structured, false);
-
-        assert_eq!(query.limit, 100);
     }
     #[test]
     fn test_distance() {
