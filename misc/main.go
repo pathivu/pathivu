@@ -42,11 +42,15 @@ func main() {
 				Ts:         1,
 				RawData:    data1,
 				Structured: true,
+				Indexes:    []string{"india"},
+				JsonKeys:   []string{"country"},
 			},
 			&api.PushLogLine{
 				Ts:         2,
 				RawData:    data2,
 				Structured: true,
+				Indexes:    []string{"pakistan"},
+				JsonKeys:   []string{"country"},
 			},
 		},
 	}

@@ -198,40 +198,48 @@ impl Handler for PushHandler {
                                 }
                                 return Ok(());
                             }) {
-                                let res = create_response(
+                                let mut res = create_response(
                                     &state,
                                     StatusCode::NOT_ACCEPTABLE,
                                     mime::TEXT_PLAIN,
                                     format!("{}", e),
                                 );
+                                let header = res.headers_mut();
+                                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                                 return oldfuture::future::ok((state, res));
                             }
                         }
                         Err(e) => {
-                            let res = create_response(
+                            let mut res = create_response(
                                 &state,
                                 StatusCode::NOT_ACCEPTABLE,
                                 mime::TEXT_PLAIN,
                                 format!("{}", e),
                             );
+                            let header = res.headers_mut();
+                            header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                             return oldfuture::future::ok((state, res));
                         }
                     }
-                    let res = create_response(
+                    let mut res = create_response(
                         &state,
                         StatusCode::CREATED,
                         mime::TEXT_PLAIN,
                         format!("ok"),
                     );
+                    let header = res.headers_mut();
+                    header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                     return oldfuture::future::ok((state, res));
                 }
                 Err(e) => {
-                    let res = create_response(
+                    let mut res = create_response(
                         &state,
                         StatusCode::NOT_ACCEPTABLE,
                         mime::TEXT_PLAIN,
                         format!("{}", e),
                     );
+                    let header = res.headers_mut();
+                    header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                     return oldfuture::future::ok((state, res));
                 }
             });
@@ -260,43 +268,51 @@ impl Handler for QueryHandler {
                     match result {
                         Ok(req) => match executor.execute(req) {
                             Ok(res) => {
-                                let res = create_response(
+                                let mut res = create_response(
                                     &state,
                                     StatusCode::OK,
                                     mime::APPLICATION_JSON,
                                     res,
                                 );
+                                let header = res.headers_mut();
+                                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
 
                                 return oldfuture::future::ok((state, res));
                             }
                             Err(e) => {
-                                let res = create_response(
+                                let mut res = create_response(
                                     &state,
                                     StatusCode::NOT_ACCEPTABLE,
                                     mime::TEXT_PLAIN,
                                     format!("{}", e),
                                 );
+                                let header = res.headers_mut();
+                                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                                 return oldfuture::future::ok((state, res));
                             }
                         },
                         Err(e) => {
-                            let res = create_response(
+                            let mut res = create_response(
                                 &state,
                                 StatusCode::NOT_ACCEPTABLE,
                                 mime::TEXT_PLAIN,
                                 format!("{}", e),
                             );
+                            let header = res.headers_mut();
+                            header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                             return oldfuture::future::ok((state, res));
                         }
                     }
                 }
                 Err(e) => {
-                    let res = create_response(
+                    let mut res = create_response(
                         &state,
                         StatusCode::NOT_ACCEPTABLE,
                         mime::TEXT_PLAIN,
                         format!("{}", e),
                     );
+                    let header = res.headers_mut();
+                    header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                     return oldfuture::future::ok((state, res));
                 }
             });
@@ -348,16 +364,20 @@ impl Handler for PartitionHandler {
         match self.partitions() {
             Ok(res) => {
                 let body = serde_json::to_string(&res).expect("Failed to serialise to json");
-                let res = create_response(&state, StatusCode::OK, mime::APPLICATION_JSON, body);
+                let mut res = create_response(&state, StatusCode::OK, mime::APPLICATION_JSON, body);
+                let header = res.headers_mut();
+                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                 return Box::new(oldfuture::future::ok((state, res)));
             }
             Err(e) => {
-                let res = create_response(
+                let mut res = create_response(
                     &state,
                     StatusCode::NOT_ACCEPTABLE,
                     mime::TEXT_PLAIN,
                     format!("{}", e),
                 );
+                let header = res.headers_mut();
+                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
                 return Box::new(oldfuture::future::ok((state, res)));
             }
         }
