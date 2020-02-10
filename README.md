@@ -1,73 +1,87 @@
-<img src="docs/img/pathivu.jpeg"  style="display: block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 50%;">    
+<div align="center">
+	<img align="center" width="30%" src="https://github.com/pathivu/pathivu/blob/master/docs/img/pathivu.jpeg?raw=true">
+	<h1>
+		Pathivu: Logs you can search
+	</h1>
+</div>
 
-# Pathivu: Logs you can search
-<table align=left style='float: left; margin: 4px 10px 0px 0px; border: 1px solid #000000;'>
 
-<tr>
-  <td>License</td>
-  <td>
-    <a href="https://github.com/pathivu/pathivu/blob/master/LICENSE">
-    <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
-    </a>
-</td>
-</tr>
-<tr>
-  <td>Build Status</td>
-  <td>
-    <a href="https://github.com/pathivu/pathivu/actions">
-    <img alt="Build Status" src="https://github.com/pathivu/pathivu/workflows/Rust/badge.svg" />
-    </a>
-  </td>
-</tr>
-<tr>
-	<td>Discord</td>
-	<td>
-		<a href="https://discord.gg/PGjRet">
-		<img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
-		</a>
-	</td>
-</tr>
-</table>
+ Pathivu is a powerful and lightweight log ingestion and aggregation system.  It offers cost-efficiency and high throughput without trading away log indexing. It is perfect for cloud native workloads.
 
---- 
 
-Pathivu is powerful log ingestion and aggregation system. It's built from scratch by having cost-efficient and high write throughput in mind without trading log indexing. 
+
+<p align="center"><img width="90%" src="https://github.com/pathivu/pathivu/blob/master/docs/tail.gif?raw=true"/></p>
+
+<div align="center">
+<a href="https://github.com/pathivu/pathivu/blob/master/LICENSE">
+	 <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square&logo=appveyor">
+</a> <a href="https://discord.gg/PGjRet">
+	  <img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
+</a> <a href="https://docs.pathivu.io/#/">
+	   <img alt="View Documentation" src="https://img.shields.io/badge/docs-view%20documentation-orange?style=flat-square&logo=appveyor" />
+</a>
+<a href="https://github.com/pathivu/pathivu/actions">
+	   <img alt="Build Status" src="https://github.com/pathivu/pathivu/workflows/Rust/badge.svg" />
+</a>
+<a href="https://pathivu.io/#/">
+	   <img alt="View Website" src="https://img.shields.io/badge/website-view%20website-yellowgreen?style=flat-square&logo=appveyor" />
+</a>
+</div>
+
+## Index
+- [Highlights](#highlights)
+- [Chola](#chola)
+- [Usage](#usage)
+- [Katchi](#katchi)
+- [Documentation](https://docs.pathivu.io/#/)
+- [Website](https://pathivu.io)
 
 ## Highlights
-- Fast Ingestion
-- Beautiful dashboard*
-- Log tailing
-- Log indexing
-- Cost-Efficient
-- Intuitive query language
+- [X] Fast Ingestion
+- [ ] Beautiful dashboard*
+- [X] Log tailing
+- [X] Log indexing
+- [X] Cost-Efficient
+- [X] Intuitive query language
+- [X] Multi-threaded log ingestion
+- [X] Structured logging replayer
+- [X] Log retention 
 
-**  Not yet released. It's on the roadmap
 
-
-
-<p align="center"><img src="docs/tail.gif?raw=true"/></p>
+## Chola
+Chola is the service that Pathivu runs. It offers a gRPC service for fast log ingestion and an HTTP(s) backend for log querying and aggregation. By default, log ingestion runs on gRPC port `6180` and querying on HTTP(s) port `5180`. 
 
 ## Usage
 
-Follow the below steps to deploy Pathivu in kubernetes Cluster
-```
+Pathivu can be deployed to your own kubernetes cluster, just follow the steps mentioned below.
+
+```sh
+# Create a namespace
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/namespace.yaml
 
+# Create pathivu deployment
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/deployment.yaml
 
+# Create pathivu service
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/service.yaml
 ```
-Then run pathivu fluentd plugin to ship logs to pathivu
+Pathivu has an internal fluentd connector that can be used for log ingestion. The following command initialized the connector and starts shipping your service logs to pathivu.
+
 ```
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/chola.yaml
 ```
-# Use katchi to see logs
-Katchi is cli tool to view logs
-```
-katchi logs --host=http://localhost:5180
+## Katchi
+Katchi CLI can be used to interact with the chola services. It has the following functionalities:
+
+- [X] Log service discovery
+- [X] Querying 
+- [X] Tailing
+- [X] Log output
+
+
+
+```sh
+$ katchi logs --host=http://localhost:5180
 APP: kube-addon-manager-minikube, ts: 2019-11-18 00:06:58 +0530 IST, line: INFO: == Kubernetes addon reconcile completed at 2019-11-17T18:36:58+00:00 ==
  
 APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:02 +0530 IST, line: INFO: Leader election disabled.
@@ -79,3 +93,8 @@ APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: INFO:
 APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: error: no objects passed to apply
 
 ```
+
+<p align="center">
+Created with :heart: by our [tigers](https://github.com/balajijinnah)
+</p>
+
