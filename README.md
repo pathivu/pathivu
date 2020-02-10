@@ -78,7 +78,50 @@ Katchi CLI can be used to interact with the chola services. It has the following
 - [X] Tailing
 - [X] Log output
 
+For example, the distinct command also provides a feature to count the number of distinct logs matched. It is a very powerful query which can handle data at a terabyte scale. For the following JSON, the `distinct(level)`command will give you a list of all distinct levels in the logs. 
 
+```json
+{
+  "data": [
+    {
+      "ts": 3,
+      "entry": {
+        "details": {
+          "error_code": "500",
+          "message": "Invalid URI"
+        },
+        "level": "warn",
+        "from": "backend"
+      },
+      "source": "demo"
+    },
+    {
+      "ts": 2,
+      "entry": {
+        "details": {
+          "error_code": "500",
+          "message": "Error connecting to database"
+        },
+        "level": "fatal",
+        "from": "app"
+      },
+      "source": "demo"
+    }
+  ]
+}
+```
+So thhe output will look something like this:
+
+```json
+{
+  "data": [
+    "fatal",
+    "warn"
+  ]
+}
+```
+
+Katchi connects to your chola instance for live log tailing as well as viewing a log snapshot. It can be triggered in the following way:
 
 ```sh
 $ katchi logs --host=http://localhost:5180
@@ -91,10 +134,7 @@ APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: INFO:
 APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: INFO: == Reconciling with deprecated label ==
  
 APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: error: no objects passed to apply
-
 ```
 
-<p align="center">
-Created with :heart: by our [tigers](https://github.com/balajijinnah)
-</p>
+Learn more about Katchi [here](https://docs.pathivu.io/#/katchi)
 
