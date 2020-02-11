@@ -30,7 +30,7 @@
 
 ## Index
 - [Highlights](#highlights)
-- [Chola](#chola)
+- [Pathivu Server](#pathivu-server)
 - [Usage](#usage)
 - [Katchi](#katchi)
 - [Documentation](https://docs.pathivu.io/#/)
@@ -48,8 +48,8 @@
 - [X] Log retention 
 
 
-## Chola
-Chola is the service that Pathivu runs. It offers a gRPC service for fast log ingestion and an HTTP(s) backend for log querying and aggregation. By default, log ingestion runs on gRPC port `6180` and querying on HTTP(s) port `5180`. 
+## Pathivu Server
+Pathivu server offers a gRPC service for fast log ingestion and an HTTP(s) backend for log querying and aggregation. By default, log ingestion runs on gRPC port `6180` and querying on HTTP(s) port `5180`. 
 
 ## Usage
 
@@ -71,7 +71,7 @@ Pathivu has an internal fluentd connector that can be used for log ingestion. Th
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/chola.yaml
 ```
 ## Katchi
-Katchi CLI can be used to interact with the chola services. It has the following functionalities:
+Katchi CLI can be used to interact with the pathivu server instance. It has the following functionalities:
 
 - [X] Log service discovery
 - [X] Querying 
@@ -110,7 +110,7 @@ For example, the distinct command also provides a feature to count the number of
   ]
 }
 ```
-So thhe output will look something like this:
+So the output will look something like this:
 
 ```json
 {
@@ -121,7 +121,7 @@ So thhe output will look something like this:
 }
 ```
 
-Katchi connects to your chola instance for live log tailing as well as viewing a log snapshot. It can be triggered in the following way:
+Katchi connects to your pathivu server instance for live log tailing as well as viewing a log snapshot. It can be triggered in the following way:
 
 ```sh
 $ katchi logs --host=http://localhost:5180
