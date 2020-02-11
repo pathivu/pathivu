@@ -133,7 +133,7 @@ func main() {
 		Long:  `query logs in the pathivu server`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set PATHIVU_HOST env or pass host flag")
 			}
 			c := newClient(host)
 			defer c.CloseConn()
@@ -158,7 +158,7 @@ func main() {
 		Long:  "tail logs of the specified apps",
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set PATHIVU_HOST env or pass host flag")
 			}
 			c := newClient(host)
 			defer c.CloseConn()
@@ -173,7 +173,7 @@ func main() {
 		Long:  `apps gives all the app name of logs that has been ingested in the pathivu`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set PATHIVU_HOST env or pass host flag")
 			}
 			c := newClient(host)
 			defer c.CloseConn()
@@ -184,7 +184,7 @@ func main() {
 			}
 		},
 	}
-	rootCmd.PersistentFlags().StringVar(&host, "host", os.Getenv("pathivu_HOST"), "pathivu host address")
+	rootCmd.PersistentFlags().StringVar(&host, "host", os.Getenv("PATHIVU_HOST"), "pathivu host address")
 	rootCmd.AddCommand(queryCmd)
 	rootCmd.AddCommand(partitionCmd)
 	rootCmd.AddCommand(tailCmd)
