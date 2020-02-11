@@ -56,7 +56,9 @@ type client struct {
 }
 
 func newClient(host string) *client {
-	conn, err := grpc.Dial(host, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(host, grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithTimeout(time.Second*10))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
