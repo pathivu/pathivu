@@ -30,11 +30,16 @@
 
 ## Index
 - [Highlights](#highlights)
+- [Architecture](#architecture)
 - [Pathivu Server](#pathivu-server)
 - [Usage](#usage)
 - [Katchi](#katchi)
 - [Documentation](https://docs.pathivu.io/#/)
 - [Website](https://pathivu.io)
+
+<br>
+<br>
+
 
 ## Highlights
 - [X] Fast Ingestion
@@ -47,9 +52,27 @@
 - [X] Structured logging replayer
 - [X] Log retention 
 
+<br>
+<br>
+
+## Architecture
+
+A *fluentd* service running on a Kubernetes node can be used to ship logs to the Pathivu server. The server then exposes two types of interfaces, namely web and CLI. 
+The web interface is a UI dashboard whereas the command line interface (Katchi) can be used to interact with Pathivu from the comfort of the terminal. 
+
+<p align="center">
+<img src="https://user-images.githubusercontent.com/30529572/74427447-1c3f2400-4e7d-11ea-950e-292723957bbb.png" alt="Pathivu Architecture" width="75%"/>
+</p>
+
+<br>
+<br>
 
 ## Pathivu Server
 Pathivu server offers a gRPC service for fast log ingestion and an HTTP(s) backend for log querying and aggregation. By default, log ingestion runs on gRPC port `6180` and querying on HTTP(s) port `5180`. 
+
+<br>
+<br>
+
 
 ## Usage
 
@@ -70,6 +93,9 @@ Pathivu has an internal fluentd connector that can be used for log ingestion. Th
 ```
 kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/chola.yaml
 ```
+<br>
+<br>
+
 ## Katchi
 Katchi CLI can be used to interact with the pathivu server instance. It has the following functionalities:
 
