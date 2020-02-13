@@ -15,7 +15,7 @@
 <div align="center">
 <a href="https://github.com/pathivu/pathivu/blob/master/LICENSE">
 	 <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square&logo=appveyor">
-</a> <a href="https://discord.gg/PGjRet">
+</a> <a href="https://discordapp.com/invite/m5hZbPv">
 	  <img src="https://img.shields.io/discord/628383521450360842.svg?logo=discord" />
 </a> <a href="https://docs.pathivu.io/#/">
 	   <img alt="View Documentation" src="https://img.shields.io/badge/docs-view%20documentation-orange?style=flat-square&logo=appveyor" />
