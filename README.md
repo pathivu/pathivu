@@ -32,8 +32,9 @@
 - [Highlights](#highlights)
 - [Architecture](#architecture)
 - [Pathivu Server](#pathivu-server)
-- [Usage](#usage)
+- [Pathivu Web](#pathivu-web)
 - [Katchi](#katchi)
+- [Usage](#usage)
 - [Documentation](https://docs.pathivu.io/#/)
 - [Website](https://pathivu.io)
 
@@ -57,8 +58,14 @@
 
 ## Architecture
 
-A *fluentd* service running on a Kubernetes node can be used to ship logs to the Pathivu server. The server then exposes two types of interfaces, namely web and CLI. 
-The web interface is a UI dashboard whereas the command line interface (Katchi) can be used to interact with Pathivu from the comfort of the terminal. 
+A *fluentd* service running on a Kubernetes node can be used to ship logs to the Pathivu server. The server then exposes two types of interfaces, namely web and CLI. The following are the components of Pathivu:
+
+* **Pathivu server**: A high performant log ingestion server where you can ingest logs at terabyte scale and query logs in efficient way, with both HTTP(s) as well as gRPC endpoints available. Read more about it [here](#pathivu-server)
+
+* **Katchi CLI**:  Katchi is the command line interface for Pathivu. Read more about it [here](#katchi)
+
+* **Pathivu Web**: It is a web based user interface for interacting with Pathivu. It makes the querying experience simplistic and intuitive. Read more about it [here](#pathivu-web.)
+
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/30529572/74427447-1c3f2400-4e7d-11ea-950e-292723957bbb.png" alt="Pathivu Architecture" width="75%"/>
@@ -68,31 +75,21 @@ The web interface is a UI dashboard whereas the command line interface (Katchi) 
 <br>
 
 ## Pathivu Server
-Pathivu server offers a gRPC service for fast log ingestion and an HTTP(s) backend for log querying and aggregation. By default, log ingestion runs on gRPC port `6180` and querying on HTTP(s) port `5180`. 
+Pathivu server is a high performant log ingestion server where you can ingest logs at terabyte scale and query logs in efficient way, with both HTTP(s) as well as gRPC endpoints available. It offers a gRPC service for fast log ingestion and an HTTP(s) backend for log querying and aggregation. By default, log ingestion runs on gRPC port `6180` and querying on HTTP(s) port `5180`. 
+
+Pathivu server has a *fluentd* connector that can be used to ship logs to pathivu from a Kubernetes node. For more information on architecture, see [this](#architecture).
 
 <br>
 <br>
 
 
-## Usage
+## Pathivu Web
+Pathivu Web is a web based user interface for interacting with Pathivu. It makes the querying experience simplistic and intuitive. You can use Pathivu's [simplistic query language](https://docs.pathivu.io/#/query) to interact with the server right from your browser.
 
-Pathivu can be deployed to your own kubernetes cluster, just follow the steps mentioned below.
+<p align="center"> 
+<img alt="Pathivu Web" src="https://user-images.githubusercontent.com/30529572/74428923-f8311200-4e7f-11ea-8373-9fecc10a6404.png" width="80%"/>
+</p>
 
-```sh
-# Create a namespace
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/namespace.yaml
-
-# Create pathivu deployment
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/deployment.yaml
-
-# Create pathivu service
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/service.yaml
-```
-Pathivu has an internal fluentd connector that can be used for log ingestion. The following command initialized the connector and starts shipping your service logs to pathivu.
-
-```
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/chola.yaml
-```
 <br>
 <br>
 
@@ -163,4 +160,29 @@ APP: kube-addon-manager-minikube, ts: 2019-11-18 00:07:03 +0530 IST, line: error
 ```
 
 Learn more about Katchi [here](https://docs.pathivu.io/#/katchi)
+
+<br>
+<br>
+
+## Usage
+
+Pathivu can be deployed to your own kubernetes cluster, just follow the steps mentioned below.
+
+```sh
+# Create a namespace
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/namespace.yaml
+
+# Create pathivu deployment
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/deployment.yaml
+
+# Create pathivu service
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/service.yaml
+```
+Pathivu has an internal fluentd connector that can be used for log ingestion. The following command initialized the connector and starts shipping your service logs to pathivu.
+
+```
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/chola.yaml
+```
+<br>
+<br>
 
