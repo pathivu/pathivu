@@ -84,25 +84,29 @@ module Fluent::Plugin
         end
       end
     end
-  
+
    def build_indexes(flattened_data)
       stemmer = UEAStemmer.new
       indexes = []
       flattened_data.each do|key,value|
           if value.kind_of?(Array)
               value.each do|inner|
-                  splits = inner.gsub(/\s+/m, ' ').strip.split(" ")
-                  splits.each do|item|
-                    if !Stopwords.is?(item)
-                      indexes.push(stemmer.stem(item))
+                  if inner.is_a? String
+                    splits = inner.gsub(/\s+/m, ' ').strip.split(" ")
+                    splits.each do|item|
+                      if !Stopwords.is?(item)
+                        indexes.push(stemmer.stem(item))
+                      end
                     end
                   end
               end  
           else
-            splits = value.gsub(/\s+/m, ' ').strip.split(" ")
-            splits.each do|item|
-              if !Stopwords.is?(item)
-                indexes.push(stemmer.stem(item))
+            if value.is_a? String
+              splits = value.gsub(/\s+/m, ' ').strip.split(" ")
+              splits.each do|item|
+                if !Stopwords.is?(item)
+                  indexes.push(stemmer.stem(item))
+                end
               end
             end
           end    

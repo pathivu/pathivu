@@ -1,0 +1,23 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: pathivu
+  namespace: kube-logging
+  labels:
+    app: pathivu
+spec:
+  selector:
+    matchLabels:
+      app: pathivu
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: pathivu
+    spec:
+      containers:
+      - name: pathivu
+        image: schoolboy/pathivu  # or just image: redis
+        ports:
+        - containerPort: 5180
+        - containerPort: 6180

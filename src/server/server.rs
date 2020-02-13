@@ -404,6 +404,34 @@ impl NewHandler for QueryHandler {
     }
 }
 
+#[derive(Clone)]
+struct CorsHandler {}
+
+impl Handler for CorsHandler {
+    fn handle(self, state: State) -> Box<HandlerFuture> {
+        let mut res = create_response(
+            &state,
+            StatusCode::OK,
+            mime::APPLICATION_JSON,
+            String::from(""),
+        );
+        let header = res.headers_mut();
+        header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+        header.insert("Access-Control-Allow-Methods", "POST".parse().unwrap());
+        header.insert(
+            "Access-Control-Allow-Headers",
+            "Content-Type".parse().unwrap(),
+        );
+        return Box::new(oldfuture::future::ok((state, res)));
+    }
+}
+impl NewHandler for CorsHandler {
+    type Instance = Self;
+
+    fn new_handler(&self) -> GothamResult<Self::Instance> {
+        Ok(self.clone())
+    }
+}
 pub struct Server {}
 impl Server {
     pub fn start(cfg: Config, store: rocks_store::RocksStore) -> Result<(), failure::Error> {
@@ -443,6 +471,7 @@ impl Server {
             route
                 .post("/query")
                 .to_new_handler(QueryHandler { executor: executor });
+            route.options("/query").to_new_handler(CorsHandler {});
             route.get("/partitions").to_new_handler(PartitionHandler {
                 partition_path: cfg.dir.clone(),
             })

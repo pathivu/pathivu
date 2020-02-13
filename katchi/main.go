@@ -56,7 +56,9 @@ type client struct {
 }
 
 func newClient(host string) *client {
-	conn, err := grpc.Dial(host, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(host, grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithTimeout(time.Second*10))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -128,12 +130,12 @@ func main() {
 		Long:  `katch is a cli tool for pathivu, which let's you folks to view all the logs in pathivu`,
 	}
 	var queryCmd = &cobra.Command{
-		Use:   "logs --apps=kube-server --partitions=api-server --since=3h --query=info",
+		Use:   "logs --apps=kube-server --apps=api-server --since=3h --query=info",
 		Short: "query logs ",
 		Long:  `query logs in the pathivu server`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set PATHIVU_HOST env or pass host flag")
 			}
 			c := newClient(host)
 			defer c.CloseConn()
@@ -158,7 +160,7 @@ func main() {
 		Long:  "tail logs of the specified apps",
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set PATHIVU_HOST env or pass host flag")
 			}
 			c := newClient(host)
 			defer c.CloseConn()
@@ -173,7 +175,7 @@ func main() {
 		Long:  `apps gives all the app name of logs that has been ingested in the pathivu`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if host == "" {
-				log.Fatalf("host name required. Set pathivu_HOST env or pass host flag")
+				log.Fatalf("host name required. Set PATHIVU_HOST env or pass host flag")
 			}
 			c := newClient(host)
 			defer c.CloseConn()
@@ -184,7 +186,7 @@ func main() {
 			}
 		},
 	}
-	rootCmd.PersistentFlags().StringVar(&host, "host", os.Getenv("pathivu_HOST"), "pathivu host address")
+	rootCmd.PersistentFlags().StringVar(&host, "host", os.Getenv("PATHIVU_HOST"), "pathivu host address")
 	rootCmd.AddCommand(queryCmd)
 	rootCmd.AddCommand(partitionCmd)
 	rootCmd.AddCommand(tailCmd)

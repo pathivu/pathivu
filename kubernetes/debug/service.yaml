@@ -1,0 +1,18 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: pathivu
+  namespace: kube-logging
+  labels:
+    app: pathivu
+spec: 
+  selector:
+    app: pathivu
+  clusterIP: None
+  ports:
+    - port: 5180
+      name: http
+      targetPort: 5180
+    - port: 6180
+      name: grpc
+      targetPort: 6180
