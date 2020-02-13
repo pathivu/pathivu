@@ -26,6 +26,9 @@ struct QueryParser;
 /// default log line limit.
 const DEFAULT_LIMIT: u64 = 10000;
 
+/// default distance to fuzzy search.
+const DEFAULT_DISTANCE: u32 = 2;
+
 /// Selection hold the selection statement.
 #[derive(Default, Debug, Clone)]
 pub struct Selection {
@@ -99,6 +102,11 @@ pub fn parse(query: String) -> Result<Query, Error> {
     // If there is no limit, update the default limit.
     if query_inner.limit == 0 {
         query_inner.limit = DEFAULT_LIMIT;
+    }
+
+    if query_inner.distance == 0 {
+        // set the default distance if there is no distance specified.
+        query_inner.distance = DEFAULT_DISTANCE;
     }
     Ok(query_inner)
 }

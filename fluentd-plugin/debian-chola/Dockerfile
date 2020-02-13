@@ -1,5 +1,5 @@
 
-FROM fluent/fluentd:v1.7.4-debian-1.0
+FROM fluent/fluentd:v1.8.1-debian-1.0
 
 LABEL maintainer="Balaji Jinnah <rbalajis25@gmail.com>"
 USER root

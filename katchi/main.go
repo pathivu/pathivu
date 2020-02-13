@@ -130,7 +130,7 @@ func main() {
 		Long:  `katch is a cli tool for pathivu, which let's you folks to view all the logs in pathivu`,
 	}
 	var queryCmd = &cobra.Command{
-		Use:   "logs --apps=kube-server --partitions=api-server --since=3h --query=info",
+		Use:   "logs --apps=kube-server --apps=api-server --since=3h --query=info",
 		Short: "query logs ",
 		Long:  `query logs in the pathivu server`,
 		Run: func(cmd *cobra.Command, args []string) {
