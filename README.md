@@ -170,18 +170,20 @@ Pathivu can be deployed to your own kubernetes cluster, just follow the steps me
 
 ```sh
 # Create a namespace
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/namespace.yaml
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/debug/namespace.yaml
 
-# Create pathivu deployment
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/deployment.yaml
 
 # Create pathivu service
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/service.yaml
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/debug/service.yaml
+
+# Create pathivu deployment
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/debug/deployment.yaml
+
 ```
 Pathivu has an internal fluentd connector that can be used for log ingestion. The following command initialized the connector and starts shipping your service logs to pathivu.
 
 ```
-kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/chola.yaml
+kubectl create -f https://raw.githubusercontent.com/pathivu/pathivu/master/kubernetes/debug/fluentd.yaml
 ```
 <br>
 <br>
