@@ -79,6 +79,10 @@ pub const STRUCTURED_DATA: u8 = 0b0000_0001;
 
 pub const UN_STRUCTURED_DATA: u8 = 0b0000_0000;
 
+pub const PATHIVU_CLUSTER_ID_KEY: &str = "PATHIVU_MUGAVARI";
+
+pub const ASK_PUSH_ADDR_COMMAND: &str = "1";
+
 // use to get the all the offset of the segment files.
 // IYANAN is one of the thamizha sangam name. which
 // means creator.

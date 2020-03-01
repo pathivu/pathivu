@@ -22,4 +22,8 @@ pub struct Config {
     pub max_batch_size: u8,
     pub max_index_size: usize,
     pub retention_period: u64,
+    pub peers: Vec<String>,
+    pub grpc_addr: String,
+    pub http_addr: String,
+    pub peer_addr: String,
 }

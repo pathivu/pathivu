@@ -319,6 +319,10 @@ pub mod tests {
             max_index_size: 100 << 10,
             max_batch_size: 1,
             retention_period: 864000,
+            peers: Vec::default(),
+            peer_addr: String::from(""),
+            grpc_addr: String::from(""),
+            http_addr: String::from(""),
         }
     }
     pub fn get_test_store(cfg: Config) -> RocksStore {

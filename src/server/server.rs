@@ -14,33 +14,32 @@
  * limitations under the License.
  */
 use crate::config::config::Config;
+use crate::ingester::manager::Manager;
 use crate::queryexecutor::executor::QueryExecutor;
 use crate::replayer::replayer::Replayer;
 use crate::store::rocks_store;
 use crate::types::types::*;
-
-use crate::ingester::manager::Manager;
-use api::server::PathivuServer;
+use api::pathivu_server::{Pathivu, PathivuServer};
 use failure::bail;
+use future;
 use futures::channel::mpsc;
 use futures::channel::oneshot;
 use futures::executor::block_on;
+use futures::prelude::*;
 use gotham;
 use gotham::error::Result as GothamResult;
 use gotham::handler::{Handler, HandlerFuture, IntoResponse, NewHandler};
 use gotham::helpers::http::response::create_response;
+use gotham::hyper::{body, Body, StatusCode};
 use gotham::router::builder::*;
 use gotham::state::{FromState, State};
-use hyper::{Body, StatusCode};
 use log::info;
 use mime;
-use oldfuture;
-use oldfuture::future::Future;
-use oldfuture::stream::Stream;
 use std::fs;
 use std::fs::create_dir_all;
 use std::panic::RefUnwindSafe;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::thread;
 use tokio::runtime::Runtime;
 use tonic;
@@ -52,7 +51,7 @@ struct PathivuGrpcServer {
 }
 
 #[tonic::async_trait]
-impl api::server::Pathivu for PathivuGrpcServer {
+impl Pathivu for PathivuGrpcServer {
     type TailStream = mpsc::Receiver<Result<api::QueryResponse, Status>>;
 
     async fn tail(
@@ -135,9 +134,9 @@ impl api::server::Pathivu for PathivuGrpcServer {
 #[derive(Clone)]
 struct HelloHandler {}
 impl Handler for HelloHandler {
-    fn handle(self, state: State) -> Box<HandlerFuture> {
+    fn handle(self, state: State) -> Pin<Box<HandlerFuture>> {
         let res = format!("Hi from chola").into_response(&state);
-        Box::new(oldfuture::future::ok((state, res)))
+        future::ok((state, res)).boxed()
     }
 }
 
@@ -161,13 +160,12 @@ impl NewHandler for PushHandler {
     }
 }
 impl Handler for PushHandler {
-    fn handle(self, mut state: State) -> Box<HandlerFuture> {
+    fn handle(self, mut state: State) -> Pin<Box<HandlerFuture>> {
         let mut manager = self.manager.clone();
-        let fut = Body::take_from(&mut state)
-            .concat2()
-            .then(move |body| match body {
-                Ok(body) => {
-                    let result = serde_json::from_slice::<PushRequest>(&body.to_vec());
+        let fut =
+            body::to_bytes(Body::take_from(&mut state)).then(move |full_body| match full_body {
+                Ok(full_body) => {
+                    let result = serde_json::from_slice::<PushRequest>(&full_body.to_vec());
                     match result {
                         Ok(req) => {
                             let mut lines = Vec::new();
@@ -206,7 +204,7 @@ impl Handler for PushHandler {
                                 );
                                 let header = res.headers_mut();
                                 header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                                return oldfuture::future::ok((state, res));
+                                return future::ok((state, res));
                             }
                         }
                         Err(e) => {
@@ -218,7 +216,7 @@ impl Handler for PushHandler {
                             );
                             let header = res.headers_mut();
                             header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                            return oldfuture::future::ok((state, res));
+                            return future::ok((state, res));
                         }
                     }
                     let mut res = create_response(
@@ -229,7 +227,7 @@ impl Handler for PushHandler {
                     );
                     let header = res.headers_mut();
                     header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                    return oldfuture::future::ok((state, res));
+                    return future::ok((state, res));
                 }
                 Err(e) => {
                     let mut res = create_response(
@@ -240,10 +238,10 @@ impl Handler for PushHandler {
                     );
                     let header = res.headers_mut();
                     header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                    return oldfuture::future::ok((state, res));
+                    return future::ok((state, res));
                 }
             });
-        Box::new(fut)
+        fut.boxed()
     }
 }
 
@@ -258,39 +256,25 @@ impl QueryHandler {
 }
 
 impl Handler for QueryHandler {
-    fn handle(self, mut state: State) -> Box<HandlerFuture> {
+    fn handle(self, mut state: State) -> Pin<Box<HandlerFuture>> {
         let mut executor = self.clone();
-        let fut = Body::take_from(&mut state)
-            .concat2()
-            .then(move |body| match body {
-                Ok(body) => {
-                    let result = serde_json::from_slice::<QueryRequest>(&body.to_vec());
-                    match result {
-                        Ok(req) => match executor.execute(req) {
-                            Ok(res) => {
-                                let mut res = create_response(
-                                    &state,
-                                    StatusCode::OK,
-                                    mime::APPLICATION_JSON,
-                                    res,
-                                );
-                                let header = res.headers_mut();
-                                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+        let fut = body::to_bytes(Body::take_from(&mut state)).then(move |body| match body {
+            Ok(body) => {
+                let result = serde_json::from_slice::<QueryRequest>(&body.to_vec());
+                match result {
+                    Ok(req) => match executor.execute(req) {
+                        Ok(res) => {
+                            let mut res = create_response(
+                                &state,
+                                StatusCode::OK,
+                                mime::APPLICATION_JSON,
+                                res,
+                            );
+                            let header = res.headers_mut();
+                            header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
 
-                                return oldfuture::future::ok((state, res));
-                            }
-                            Err(e) => {
-                                let mut res = create_response(
-                                    &state,
-                                    StatusCode::NOT_ACCEPTABLE,
-                                    mime::TEXT_PLAIN,
-                                    format!("{}", e),
-                                );
-                                let header = res.headers_mut();
-                                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                                return oldfuture::future::ok((state, res));
-                            }
-                        },
+                            return future::ok((state, res));
+                        }
                         Err(e) => {
                             let mut res = create_response(
                                 &state,
@@ -300,23 +284,35 @@ impl Handler for QueryHandler {
                             );
                             let header = res.headers_mut();
                             header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                            return oldfuture::future::ok((state, res));
+                            return future::ok((state, res));
                         }
+                    },
+                    Err(e) => {
+                        let mut res = create_response(
+                            &state,
+                            StatusCode::NOT_ACCEPTABLE,
+                            mime::TEXT_PLAIN,
+                            format!("{}", e),
+                        );
+                        let header = res.headers_mut();
+                        header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+                        return future::ok((state, res));
                     }
                 }
-                Err(e) => {
-                    let mut res = create_response(
-                        &state,
-                        StatusCode::NOT_ACCEPTABLE,
-                        mime::TEXT_PLAIN,
-                        format!("{}", e),
-                    );
-                    let header = res.headers_mut();
-                    header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                    return oldfuture::future::ok((state, res));
-                }
-            });
-        Box::new(fut)
+            }
+            Err(e) => {
+                let mut res = create_response(
+                    &state,
+                    StatusCode::NOT_ACCEPTABLE,
+                    mime::TEXT_PLAIN,
+                    format!("{}", e),
+                );
+                let header = res.headers_mut();
+                header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+                return future::ok((state, res));
+            }
+        });
+        fut.boxed()
     }
 }
 impl Clone for QueryHandler {
@@ -360,14 +356,14 @@ impl PartitionHandler {
 }
 
 impl Handler for PartitionHandler {
-    fn handle(self, state: State) -> Box<HandlerFuture> {
+    fn handle(self, state: State) -> Pin<Box<HandlerFuture>> {
         match self.partitions() {
             Ok(res) => {
                 let body = serde_json::to_string(&res).expect("Failed to serialise to json");
                 let mut res = create_response(&state, StatusCode::OK, mime::APPLICATION_JSON, body);
                 let header = res.headers_mut();
                 header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                return Box::new(oldfuture::future::ok((state, res)));
+                return future::ok((state, res)).boxed();
             }
             Err(e) => {
                 let mut res = create_response(
@@ -378,7 +374,7 @@ impl Handler for PartitionHandler {
                 );
                 let header = res.headers_mut();
                 header.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-                return Box::new(oldfuture::future::ok((state, res)));
+                return future::ok((state, res)).boxed();
             }
         }
     }
@@ -408,7 +404,7 @@ impl NewHandler for QueryHandler {
 struct CorsHandler {}
 
 impl Handler for CorsHandler {
-    fn handle(self, state: State) -> Box<HandlerFuture> {
+    fn handle(self, state: State) -> Pin<Box<HandlerFuture>> {
         let mut res = create_response(
             &state,
             StatusCode::OK,
@@ -422,7 +418,7 @@ impl Handler for CorsHandler {
             "Access-Control-Allow-Headers",
             "Content-Type".parse().unwrap(),
         );
-        return Box::new(oldfuture::future::ok((state, res)));
+        return future::ok((state, res)).boxed();
     }
 }
 impl NewHandler for CorsHandler {
@@ -442,14 +438,14 @@ impl Server {
 
         let manager = Manager::new(cfg.clone(), store.clone());
         let executor = QueryExecutor::new(cfg.clone(), manager.clone(), store);
-        let addr = "0.0.0.0:6180".parse().unwrap();
+        let addr = cfg.grpc_addr.parse().unwrap();
         let pathivu_grpc = PathivuGrpcServer {
             ingester_manager: manager.clone(),
             query_executor: executor.clone(),
             partition_path: cfg.dir.clone(),
         };
         thread::spawn(move || {
-            let rt = Runtime::new().unwrap();
+            let mut rt = Runtime::new().unwrap();
             rt.block_on(async {
                 println!("Listening pathivu grpc server on 6180");
                 TonicServer::builder()
@@ -460,9 +456,8 @@ impl Server {
                 (())
             });
         });
-        info!("pathivu lisenting on 5180");
-        let addr = "0.0.0.0:5180";
-        println!("Listening for requests at http://{}", addr);
+
+        println!("Listening for requests at http://{}", cfg.http_addr);
         let router = build_simple_router(|route| {
             route
                 .post("/push")
@@ -476,7 +471,7 @@ impl Server {
                 partition_path: cfg.dir.clone(),
             })
         });
-        gotham::start(addr, router);
+        gotham::start(cfg.http_addr, router);
         Ok(())
     }
 }

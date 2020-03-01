@@ -7,19 +7,17 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-failure = "0.1.5"
+failure = "0.1.6"
 byteorder = "1.3.2"
 fst = "0.3.5"
 sled = "0.28.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-futures-preview = "0.3.0-alpha.17"
+futures = "0.3.1"
 log = "0.4"
 rmp-serde = "0.14.0"
-gotham = "0.4.0"
 simplelog = "0.7.1"
 hyper = "0.12"
-oldfuture = {package="futures" , version="0.1"}
 mime = "0.3.14"
 cpuprofiler = "0.0.2"
 binary-heap-plus = "0.2.0"
@@ -29,9 +27,9 @@ tempfile = "3"
 rust-stemmers = "1.2.0"
 stopwords = "0.1.0"
 bytes = "0.4"
-tonic = "0.1.0-alpha.6"
-prost = "0.5.0"
-tokio = "=0.2.0-alpha.6"
+tonic = "0.1.1"
+prost = "0.6"
+tokio = " 0.2.6"
 retain_mut = "0.1.0"
 array_tool = "1.0.3"
 # Required for wellknown types
@@ -43,8 +41,11 @@ isahc = "0.8.2"
 num_cpus = "1.11.1"
 whoami = "0.6"
 clap = "2"
+uuid = "0.8.1"
+artillery-core = {git = "https://github.com/bastion-rs/artillery.git", branch = "balaji/payload"}
 [dependencies.rocksdb]
 git = "https://github.com/pingcap/rust-rocksdb.git"
-
+[dependencies.gotham]
+git = "https://github.com/gotham-rs/gotham.git"
 [build-dependencies]
-tonic-build = "0.1.0-alpha.4"
+tonic-build = "0.1.1"
